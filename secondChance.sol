@@ -78,7 +78,7 @@ contract Second_Chance is ERC20 {
         require(msg.value >= 1*1e18, "min 1 ETH to LGE");
         
         contractInitialized = block.timestamp;
-        setTXandBURNFees(10, 10); //1% on buy, 0.1% burn.
+        setTXandBURNFees(10, 10); //1% on buy on UNI, 0.1% uniBurn when wrapped
         ETHfee = 5*1e16; //0.05 EHT
         
         recycler = _recycler;
@@ -270,6 +270,12 @@ contract Second_Chance is ERC20 {
     }
     function viewFarm() public view returns(address) {
         return farm;
+    }
+    function viewFeeOnTx() public view returns(uint256) {
+        return feeOnTx;
+    }
+    function viewBurnOnTx() public view returns(uint256) {
+        return burnOnTx;
     }
     
     
