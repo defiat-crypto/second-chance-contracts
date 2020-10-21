@@ -1,13 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.6.0;
+
 import "./ERC20.sol";
-
-
-
-interface IFarm {
-    function loadRewards(uint256 _amount, uint256 _preStake) external;
-}
 
 contract Second_Chance is ERC20 { 
 
@@ -244,7 +239,7 @@ contract Second_Chance is ERC20 {
         DFTRequirement = _req;
     }
     function setWrappingRatio(uint256 _ratioBase100) public onlyOwner {
-        Irecycler(recycler).setWrappingRatio(_ratioBase100);
+        IRecycler(recycler).setWrappingRatio(_ratioBase100);
     }
    
     function whiteListToken(address _token, bool _bool) public onlyOwner {

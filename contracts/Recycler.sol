@@ -32,7 +32,7 @@ contract Recycler is ERC20 {
         require(msg.sender == owner);
         wrappingRatio = 100;
         secondChance = _secondChance;
-        UNIv2 = IsecondChance(secondChance).viewUNIv2();
+        UNIv2 = ISecondChance(secondChance).viewUNIv2();
         require(secondChance != address(0) && UNIv2 != address(0));
     }
 
@@ -54,9 +54,9 @@ contract Recycler is ERC20 {
     }
     
     function postWrapBurnfromUNI() public {
-        uint256 burnRate = IsecondChance(secondChance).viewBurnOnTx();
+        uint256 burnRate = ISecondChance(secondChance).viewBurnOnTx();
         uint256 toBurnFromUni = ERC20(secondChance).balanceOf(UNIv2).mul(burnRate).div(1000);
-        IsecondChance(secondChance).burnFromUni(toBurnFromUni); //create a small burn (0.05% of supply)
+        ISecondChance(secondChance).burnFromUni(toBurnFromUni); //create a small burn (0.05% of supply)
     }
     
     //Allows user to wrap UNIv2 tokens
@@ -73,8 +73,8 @@ contract Recycler is ERC20 {
     //Seaparated from the 2ND _transfer function to save gas. (bulk sends).
     //Triggered every time someone WRAPS
     function sendToFarm() public {
-        address farm = IsecondChance(secondChance).viewFarm();
-        Ifarm(farm).loadRewards(balanceOf(address(this)), 0); //updating the vault with rewards sent.
+        address farm = ISecondChance(secondChance).viewFarm();
+        IFarm(farm).loadRewards(balanceOf(address(this)), 0); //updating the vault with rewards sent.
     }
     
 

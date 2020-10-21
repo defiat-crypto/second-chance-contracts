@@ -2,8 +2,8 @@
 
 pragma solidity ^0.6.6;
 
-import "./Libraries.sol";
 import "./Interfaces.sol";
+import "./Libraries.sol";
 
 contract ERC20 is Context, IERC20 { 
     using SafeMath for uint256;
