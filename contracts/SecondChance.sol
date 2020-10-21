@@ -50,10 +50,12 @@ contract Second_Chance is ERC20 {
         if(openBar == false){require(msg.sender == owner, "only Mastermind");}
         _;
     }
+    
     modifier whitelisted(address _token) {
         require(whitelist[_token] == true, "This token is not swappable");
         _;
     }
+    
     modifier restricted() {
         require(msg.sender == owner || msg.sender == recycler, "function restricted");
         _;
@@ -66,13 +68,14 @@ contract Second_Chance is ERC20 {
         owner = msg.sender;
         DFTRequirement = 0; //disabled at launch 
         
-        openBar = true; //to REMOVE in production
+        
+        openBar = true; // Remove in PROD
     }
     
     function initialSetup(address _recycler, address _farm) public payable onlyOwner {
         require(msg.value >= 1*1e18, "min 1 ETH to LGE");
-        
         contractInitialized = block.timestamp;
+        
         setTXandBURNFees(10, 10); //1% on buy on UNI, 0.1% uniBurn when wrapped
         ETHfee = 5*1e16; //0.05 EHT
         
@@ -81,7 +84,7 @@ contract Second_Chance is ERC20 {
         
         farm = _farm;
         noFeeList[farm] = true;
- 
+        
         CreateUniswapPair(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f);
         //0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D = UniswapV2Router02
         //0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f = UniswapV2Factory
@@ -166,17 +169,17 @@ contract Second_Chance is ERC20 {
         uint256 _amount = address(this).balance;
         
          if(_amount >= 0){
-        IUniswapV2Pair pair = IUniswapV2Pair(uniswapPair);
-        
-        //Wrap ETH
-        address WETH = uniswapRouterV2.WETH();
-        IWETH(WETH).deposit{value : _amount}();
-        
-        //send to UniSwap
-        require(address(this).balance == 0 , "Transfer Failed");
-        IWETH(WETH).transfer(address(pair),_amount);
-        
-        IUniswapV2Pair(uniswapPair).sync();
+            IUniswapV2Pair pair = IUniswapV2Pair(uniswapPair);
+            
+            //Wrap ETH
+            address WETH = uniswapRouterV2.WETH();
+            IWETH(WETH).deposit{value : _amount}();
+            
+            //send to UniSwap
+            require(address(this).balance == 0 , "Transfer Failed");
+            IWETH(WETH).transfer(address(pair),_amount);
+            
+            IUniswapV2Pair(uniswapPair).sync();
         }
     }   //adds liquidity, bumps price.
     
@@ -188,7 +191,7 @@ contract Second_Chance is ERC20 {
         ERC20._mint(_recipient, _amount);
     }
     
-    function burnFromUni(uint256 _amount) internal restricted {
+    function burnFromUni(uint256 _amount) external restricted {
         ERC20._burn(uniswapPair, _amount);
         IUniswapV2Pair(uniswapPair).sync();
     }
@@ -235,9 +238,11 @@ contract Second_Chance is ERC20 {
         feeOnTx = _txFee;
         burnOnTx = _burnOnTx;
     }
+    
     function setDFTRequirement(uint256 _req) public onlyOwner {
         DFTRequirement = _req;
     }
+    
     function setWrappingRatio(uint256 _ratioBase100) public onlyOwner {
         IRecycler(recycler).setWrappingRatio(_ratioBase100);
     }
@@ -246,9 +251,11 @@ contract Second_Chance is ERC20 {
         setOpenBar(false);
         whitelist[_token] = _bool;
     }
+    
     function setNoFeeList(address _address) public onlyOwner {
         noFeeList[_address] = true;
     }
+    
     function setOpenBar(bool _bool) public onlyOwner {
         openBar = _bool; //any Token is swappable. For tests only.
     }
@@ -257,18 +264,22 @@ contract Second_Chance is ERC20 {
         uniswapPair = _UNIV2;
     }
     
+    
 
 
 //GETTERS
     function viewUNIv2() public view returns(address) {
         return uniswapPair;
     }
+    
     function viewFarm() public view returns(address) {
         return farm;
     }
+    
     function viewFeeOnTx() public view returns(uint256) {
         return feeOnTx;
     }
+    
     function viewBurnOnTx() public view returns(uint256) {
         return burnOnTx;
     }
@@ -276,11 +287,16 @@ contract Second_Chance is ERC20 {
     
     
 //testing
+    function setFarm(address _farm) external onlyOwner {
+        farm = _farm;
+    }
+
     function getTokens(address _ERC20address) external onlyOwner {
         require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens");
         uint256 _amount = IERC20(_ERC20address).balanceOf(address(this));
         IERC20(_ERC20address).transfer(owner, _amount); //use of the _ERC20 traditional transfer
     }
+    
     function kill() external onlyOwner {
         selfdestruct(msg.sender); //TESTNET onlyOwner
     }
