@@ -223,7 +223,7 @@ contract Second_Chance is ERC20 {
         setBalance(sender, balanceOf(sender).sub(amount, "ERC20: transfer amount exceeds balance"));
 
         //update feeOnTx dynamic variables
-        txCount++;
+        if(amount > 0){txCount++;}
         cumulVol = cumulVol.add(amount);
 
         //calculate net amounts and fee
