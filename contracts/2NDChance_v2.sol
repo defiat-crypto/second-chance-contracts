@@ -357,3 +357,42 @@ contract Second_Chance is ERC20 {
     }
     
 }
+
+
+contract BuyBacks {
+ using SafeMath for uint;
+ 
+address public UniswapV2Router02 = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+address public WETH;
+address[] public path;
+address public treasury; 
+address public second = address(0x3325f17Eeb6fC4C8D8B536FF7611f9A9b25944F0);
+address public DFT = address(0xBC935114084188636d7C854f49f03F0A85B8FDF1);  //UNICORE on Rink
+
+ constructor () public {
+
+        treasury = msg.sender; //test only
+        
+        WETH = IUniswapV2Router02(UniswapV2Router02).WETH();
+        path.push(second);
+        path.push(WETH);
+        path.push(DFT);
+ }
+    
+function approbveUNI() public {
+    address ETH2NDpair = 0xa87efbeF892A5AB5B38aC7e85A8C5e4f0Da62621;
+    address router = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
+    ERC20(second).approve(ETH2NDpair, 1e50);
+    ERC20(second).approve(router, 1e50);
+}
+
+function buyBack() public { //buyback DFT with 2ND.
+uint amountIn = IERC20(second).balanceOf(address(this));
+uint amountOutMin = 0;
+
+IUniswapV2Router02(UniswapV2Router02).swapExactTokensForTokens(
+            amountIn, amountOutMin, path, treasury, block.timestamp.add(24 hours));
+}
+
+
+}
