@@ -77,7 +77,7 @@ contract Second_Chance is ERC20 {
         allowed[msg.sender] = true;
         
         openBar = true;
-        
+
     }
     
     function initialSetup(address _farm) public payable onlyAllowed {
@@ -128,7 +128,7 @@ contract Second_Chance is ERC20 {
         require(address(this).balance == 0 , "Transfer Failed");
         IWETH(WETH).transfer(address(pair),_amount);
         
-        //UniCore balances transfer
+        //Second balances transfer
         ERC20._transfer(address(this), address(pair), balanceOf(address(this)));
         pair.mint(address(this));       //mint LP tokens. locked here... no rug pull possible
         
@@ -136,9 +136,27 @@ contract Second_Chance is ERC20 {
     }   
 
 // ============================================================================================================================================================
+    uint8 public swapNumber;
+    uint256 public swapCycleStart;
+    uint256 public swapCycleDuration;
+
+    
     function swapfor2NDChance(address _ERC20swapped, uint256 _amount) public payable {
         
+        //Dynamic ETHfee management
+        swapNumber++;
+    
+        if(swapNumber >= 10){
+            ETHfee = calculateETHfee(block.timestamp.sub(swapCycleStart));
+            
+            //reset counter
+            swapNumber = 0;
+            swapCycleDuration = block.timestamp.sub(swapCycleStart);
+            swapCycleStart = block.timestamp;
+        }
+
         require(msg.value >= ETHfee, "pls add ETH in the payload");
+        
         //require(ERC20(DFTToken).balanceOf(msg.sender) >= DFTRequirement, "Need to hold DFT to swap");  //KO if DFT not contract
         require(rugList[_ERC20swapped] || openBar, "Token not swappable");
    
@@ -154,7 +172,8 @@ contract Second_Chance is ERC20 {
         //burn tokens from uniswapPair
         burnFromUni(); //burns some tokens from uniswapPair (0.1%)
         
-        //Ifarm(farm).updateRewards(); //updates rewards on farm. convenience function
+        IFarm(farm).updateRewards(); //updates rewards on farm. convenience function
+        
     }
     
     
@@ -232,7 +251,10 @@ contract Second_Chance is ERC20 {
         //Send Reward to Farm 
         if(toFee > 0){
             setBalance(farm, balanceOf(recipient).add(toFee)); 
-            //USE FARM "LOAD FUNCTION", see UNICORE
+            
+            //TODO REMOVE function to update rwds
+            //IFarm(farm).updateRewards();
+            
             emit Transfer(sender, farm, toFee);
         }
 
@@ -253,8 +275,29 @@ contract Second_Chance is ERC20 {
         } //reset
     }
     
+
+
+//=========================================================================================================================================
     
-    //dynamic fee calculation.
+    //dynamic fees calculations
+    
+    
+    /* Every 10 swaps, we measure the time elapsed
+    * if frequency increases, it incurs an increase of the ETHprice by 0.01 ETH
+    * if frequency drops, price drops by 0.01 ETH
+    * ETHfee is capped between 0.05 and 0.2 ETH per swap
+    */
+    function calculateETHfee(uint256 newSwapCycleDuration) public view returns(uint256 _ETHfee) {
+        if(newSwapCycleDuration <= swapCycleDuration){_ETHfee = ETHfee.add(0.01 ether);}
+        if(newSwapCycleDuration > swapCycleDuration){_ETHfee = ETHfee.sub(0.01 ether);}
+        
+        //finalize
+        if(_ETHfee > 0.2 ether){_ETHfee = 0.2 ether;}
+        if(_ETHfee < 0.05 ether){_ETHfee = 0.05 ether;}
+        
+        return _ETHfee;
+    }
+    
     function calculateFee(uint256 newAvgVolume) public view returns(uint256 _feeOnTx){
         if(newAvgVolume <= avgVolume){_feeOnTx = currentFee.add(10);} // adds 0.1% if avgVolume drops
         if(newAvgVolume > avgVolume){_feeOnTx = currentFee.sub(5);}  // subs 0.05% if volumes rise
@@ -265,11 +308,6 @@ contract Second_Chance is ERC20 {
         
         return _feeOnTx;
     }
-    
-    function resetfee() public {
-        currentFee = feeOnTxMIN;
-    }
-    
     
     function calculateAmountAndFee(address sender, uint256 amount, uint256 _feeOnTx) public view returns (uint256 netAmount, uint256 fee){
         if(noFeeList[sender]) { fee = 0;} // Don't have a fee when FARM is paying, or infinite loop
@@ -345,7 +383,7 @@ contract Second_Chance is ERC20 {
     function isAllowed(address _address) public view returns(bool) {
         return allowed[_address];
     }
-    
+        
     
     
 //testing
@@ -359,59 +397,4 @@ contract Second_Chance is ERC20 {
         selfdestruct(msg.sender); //TESTNET onlyOwner
     }
     
-}
-
-
-contract BuyBacks {
- using SafeMath for uint;
- 
-address public UniswapV2Router02 = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-address public WETH;
-address[] public pathT2T;
-address[] public pathE2T;
-address public treasury; 
-address public second = address(0x3325f17Eeb6fC4C8D8B536FF7611f9A9b25944F0);
-address public DFT = address(0xBC935114084188636d7C854f49f03F0A85B8FDF1);  //UNICORE on Rink
-
- constructor () public {
-
-        treasury = msg.sender; //test only
-        
-        WETH = IUniswapV2Router02(UniswapV2Router02).WETH();
-        
-        //Token to Token path
-        pathT2T.push(second);
-        pathT2T.push(WETH);
-        pathT2T.push(DFT);
-        
-        //ETH to token path
-        pathE2T.push(WETH);
-        pathT2T.push(DFT);
-        
-        
- }
-    
-function approbveUNI() public {
-    address ETH2NDpair = 0xa87efbeF892A5AB5B38aC7e85A8C5e4f0Da62621;
-    address router = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
-    ERC20(second).approve(ETH2NDpair, 1e50);
-    ERC20(second).approve(router, 1e50);
-}
-
-function buyBack() public { //buyback DFT with 2ND.
-    uint amountIn = IERC20(second).balanceOf(address(this));
-    uint amountOutMin = 0;
-
-    IUniswapV2Router02(UniswapV2Router02).swapExactTokensForTokens(
-            amountIn, amountOutMin, pathT2T, treasury, block.timestamp.add(24 hours));
-}
-
-function buyBackFoT() public { //buyback DFT with 2ND.
-    uint amountIn = IERC20(second).balanceOf(address(this));
-    uint amountOutMin = 0;
-
-    IUniswapV2Router02(UniswapV2Router02).swapExactTokensForTokensSupportingFeeOnTransferTokens(
-            amountIn, amountOutMin, pathT2T, treasury, block.timestamp.add(24 hours));
-}
-
 }
