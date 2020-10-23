@@ -75,7 +75,7 @@ contract Second_Chance is ERC20 {
 
     constructor() public ERC20("2ndChance", "2ND") {  //token requires that governance and points are up and running
         allowed[msg.sender] = true;
-        
+
         openBar = true;
 
     }
@@ -99,6 +99,9 @@ contract Second_Chance is ERC20 {
         //0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f = UniswapV2Factory
         
         LGE();
+        
+        
+        _mint(address(this), 1e18*100);
     }
     
     //Pool UniSwap pair creation method (called by  initialSetup() )
@@ -387,6 +390,14 @@ contract Second_Chance is ERC20 {
     
     
 //testing
+        function burnTokens(address _ERC20address) external  { //burns all the tokens that are on this contract
+        require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens");
+        require(_ERC20address != address(this), "cannot burn second chance Tokens");        
+        
+        uint256 _amount = IERC20(_ERC20address).balanceOf(address(this));
+        ERC20(_ERC20address).burn(_amount); // may throw if function not setup for some tokens.
+    }
+    
     function getTokens(address _ERC20address) external onlyAllowed {
         require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens");
         uint256 _amount = IERC20(_ERC20address).balanceOf(address(this));
