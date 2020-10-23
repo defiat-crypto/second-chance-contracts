@@ -41,7 +41,8 @@ contract UniCore_Vault {
     }
     PoolInfo[] public poolInfo;
 
-    uint256 public totalAllocPoint;     // Total allocation points. Must be the sum of all allocation points in all pools.
+    uint256 public lockRatio100;        // How much UNIv2 is given back (%)
+    uint256 public totalAllocPoint;     //Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public pendingRewards;      // pending rewards awaiting anyone to massUpdate
     uint256 public contractStartBlock;
     uint256 public epochCalculationStartBlock;
@@ -62,6 +63,7 @@ contract UniCore_Vault {
         second  = _second;
         Treasury = msg.sender; //
         treasuryFee = 1000; //10%
+        lockRatio100 = 75; //75% of UniV2 given back
         
         contractStartBlock = block.number;
     }
@@ -259,7 +261,7 @@ contract UniCore_Vault {
     function withdraw(uint256 _pid, uint256 _amount) external NoReentrant(msg.sender) {
         lastTXBlock[msg.sender] = block.number+1; 
         
-        _withdraw(_pid, _amount.mul(75).div(100), msg.sender, msg.sender); //25% permanent lock
+        _withdraw(_pid, _amount.mul(lockRatio100).div(100), msg.sender, msg.sender); //25% permanent lock
         
         transferTreasuryFees(); //incurs a gas penalty -> forces treasury fees transfer
     }
@@ -330,6 +332,11 @@ contract UniCore_Vault {
     function chgTreasury(address _new) public onlyAllowed {
         Treasury = _new;
     }
+    
+    function chgLockRatio(uint256 _UNIv2ToRelease100) public onlyAllowed {
+        lockRatio100 = _UNIv2ToRelease100;
+    }
+
 
 // utils    
     mapping(address => bool) nonWithdrawableByAdmin;
