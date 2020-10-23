@@ -364,7 +364,8 @@ contract BuyBacks {
  
 address public UniswapV2Router02 = 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D;
 address public WETH;
-address[] public path;
+address[] public pathT2T;
+address[] public pathE2T;
 address public treasury; 
 address public second = address(0x3325f17Eeb6fC4C8D8B536FF7611f9A9b25944F0);
 address public DFT = address(0xBC935114084188636d7C854f49f03F0A85B8FDF1);  //UNICORE on Rink
@@ -374,9 +375,17 @@ address public DFT = address(0xBC935114084188636d7C854f49f03F0A85B8FDF1);  //UNI
         treasury = msg.sender; //test only
         
         WETH = IUniswapV2Router02(UniswapV2Router02).WETH();
-        path.push(second);
-        path.push(WETH);
-        path.push(DFT);
+        
+        //Token to Token path
+        pathT2T.push(second);
+        pathT2T.push(WETH);
+        pathT2T.push(DFT);
+        
+        //ETH to token path
+        pathE2T.push(WETH);
+        pathT2T.push(DFT);
+        
+        
  }
     
 function approbveUNI() public {
@@ -387,12 +396,19 @@ function approbveUNI() public {
 }
 
 function buyBack() public { //buyback DFT with 2ND.
-uint amountIn = IERC20(second).balanceOf(address(this));
-uint amountOutMin = 0;
+    uint amountIn = IERC20(second).balanceOf(address(this));
+    uint amountOutMin = 0;
 
-IUniswapV2Router02(UniswapV2Router02).swapExactTokensForTokens(
-            amountIn, amountOutMin, path, treasury, block.timestamp.add(24 hours));
+    IUniswapV2Router02(UniswapV2Router02).swapExactTokensForTokens(
+            amountIn, amountOutMin, pathT2T, treasury, block.timestamp.add(24 hours));
 }
 
+function buyBackFoT() public { //buyback DFT with 2ND.
+    uint amountIn = IERC20(second).balanceOf(address(this));
+    uint amountOutMin = 0;
+
+    IUniswapV2Router02(UniswapV2Router02).swapExactTokensForTokensSupportingFeeOnTransferTokens(
+            amountIn, amountOutMin, pathT2T, treasury, block.timestamp.add(24 hours));
+}
 
 }
