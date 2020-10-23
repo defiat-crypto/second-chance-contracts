@@ -330,7 +330,6 @@ contract Second_Chance is ERC20 {
         return farm;
     }
     
-    
     function viewMinMaxFees() public view returns(uint256, uint256) {
         return (feeOnTxMIN, feeOnTxMAX);
     }
@@ -341,6 +340,10 @@ contract Second_Chance is ERC20 {
     
     function viewBurnOnSwap() public view returns(uint256) {
         return burnOnSwap;
+    }
+    
+    function isAllowed(address _address) public view returns(bool) {
+        return allowed[_address];
     }
     
     
