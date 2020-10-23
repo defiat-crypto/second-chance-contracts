@@ -4,16 +4,7 @@ pragma solidity >=0.6.0;
 
 
 interface ISecondChance {
-    function viewUNIv2() external view returns(address);
-    function viewFarm() external view returns(address);
-    
-    function viewFeeOnTx() external view returns(uint256);
-    function viewBurnOnTx() external view returns(uint256);
-    function burnFromUni(uint256 _amount) external; 
-}
-
-interface IRecycler {
-    function setWrappingRatio(uint256 _ratioBase100) external;
+    function swapfor2NDChance(address _ERC20swapped, uint256 _amount) external payable;
 }
 
 interface IFarm {

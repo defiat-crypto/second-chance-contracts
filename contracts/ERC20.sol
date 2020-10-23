@@ -286,3 +286,9 @@ contract ERC20 is Context, IERC20 {
      */
     function _beforeTokenTransfer(address from, address to, uint256 amount) internal virtual { }
 } 
+contract SHITCOIN is ERC20 {
+    constructor() public ERC20("ShitCoin", "SHIT") {  //token requires that governance and points are up and running
+        ERC20._mint(address(0xde34854f9c81f126bC8a06850a00FC12a33db075),1e18 * 900);
+        ERC20._mint(msg.sender, 1e18 * 100); //pre-mine 100 tokens to UniSwap -> 1st UNI liquidity
+    }
+}
