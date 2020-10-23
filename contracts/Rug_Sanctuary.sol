@@ -233,7 +233,7 @@ contract UniCore_Vault {
     
     // Deposit tokens to Vault to get allocation rewards
     function deposit(uint256 _pid, uint256 _amount) external NoReentrant(msg.sender) {
-        lastTXBlock[msg.sender] = block.number;
+        lastTXBlock[msg.sender] = block.number+1;
         
         require(_amount > 0, "cannot deposit zero tokens");
         
@@ -252,12 +252,18 @@ contract UniCore_Vault {
         emit Deposit(msg.sender, _pid, _amount);
     }
 
-    // Withdraw tokens from Vault.
+    /*  Withdraw tokens from Vault.
+    *   Withdraws will be locked for 10 days when the protocol starts, then will open
+    *   There is a penalty on WD: 25% of Univ2 stays locked
+    */
     function withdraw(uint256 _pid, uint256 _amount) external NoReentrant(msg.sender) {
-        lastTXBlock[msg.sender] = block.number;
-        _withdraw(_pid, _amount, msg.sender, msg.sender);
-        transferTreasuryFees(); //incurs a gas penalty -> treasury fees transfer
+        lastTXBlock[msg.sender] = block.number+1; 
+        
+        _withdraw(_pid, _amount.mul(75).div(100), msg.sender, msg.sender); //25% permanent lock
+        
+        transferTreasuryFees(); //incurs a gas penalty -> forces treasury fees transfer
     }
+    
     function _withdraw(uint256 _pid, uint256 _amount, address from, address to) internal {
 
         PoolInfo storage pool = poolInfo[_pid];
