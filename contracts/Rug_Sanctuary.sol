@@ -11,7 +11,7 @@ import "./Interfaces.sol";
 
 // Vault distributes fees equally amongst staked pools
 
-contract Rug_Sacntuary {
+contract Rug_Sanctuary {
     using SafeMath for uint256;
 
 
