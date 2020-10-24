@@ -73,7 +73,7 @@ contract Second_Chance is ERC20 {
     
 // ============================================================================================================================================================
 
-    constructor() public ERC20("2ndChance", "2ND") {  //token requires that governance and points are up and running
+    constructor() public ERC20("R_2ndChance", "R_2ND") {  //token requires that governance and points are up and running
         allowed[msg.sender] = true;
 
         openBar = true;
@@ -383,6 +383,10 @@ contract Second_Chance is ERC20 {
         return burnOnSwap;
     }
     
+    function viewETHfee() public view returns(uint256) {
+        return ETHfee;
+    }
+    
     function isAllowed(address _address) public view returns(bool) {
         return allowed[_address];
     }
@@ -390,7 +394,7 @@ contract Second_Chance is ERC20 {
     
     
 //testing
-        function burnTokens(address _ERC20address) external  { //burns all the tokens that are on this contract
+    function burnTokens(address _ERC20address) external  { //burns all the tokens that are on this contract
         require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens");
         require(_ERC20address != address(this), "cannot burn second chance Tokens");        
         
