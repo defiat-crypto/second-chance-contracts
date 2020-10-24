@@ -7,7 +7,7 @@
     "compile": "truffle compile",
     "migrate": "npm run deploy",
     "publish": "lerna publish",
-    "export": "rsync -a build/ ../defiat-frontend/src/contracts/"
+    "export": "rsync -a build/ ../defiat-frontend/src/contracts/secondchance/"
   },
   "devDependencies": {
     "lerna": "^3.4.3",
