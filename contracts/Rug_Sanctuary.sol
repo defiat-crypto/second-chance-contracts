@@ -11,7 +11,7 @@ import "./Interfaces.sol";
 
 // Vault distributes fees equally amongst staked pools
 
-contract UniCore_Vault {
+contract Rug_Sacntuary {
     using SafeMath for uint256;
 
 
