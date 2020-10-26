@@ -19,7 +19,7 @@ contract Second_Chance is ERC20 {
     uint8 private _decimals;
     
     
-    uint256 public contractInitialized;
+    uint256 private contractInitialized;
     
     
     bool openBar;
@@ -30,27 +30,28 @@ contract Second_Chance is ERC20 {
     
     address public uniswapPair; //to determine.
     address public farm;
-    address public constant DFTToken = address(0xB6eE603933E024d8d53dDE3faa0bf98fE2a3d6f1);
+    address public constant DFT = address(0xB571d40e4A7087C1B73ce6a3f29EaDfCA022C5B2); //2nd_Rinkeby
+                                     //address(0xB6eE603933E024d8d53dDE3faa0bf98fE2a3d6f1); //Mainnet
     
     
     //Swapping metrics
     mapping(address => bool) public rugList;
-    uint256 public ETHfee;    
-    uint256 public DFTRequirement; 
+    uint256 private ETHfee;    
+    uint256 private DFTRequirement; 
     
     
     
     //TX metrics
     mapping (address => bool) public noFeeList;
-    uint256 public feeOnTxMIN; // base 1000
-    uint256 public feeOnTxMAX; // base 1000
-    uint256 public burnOnSwap; // base 1000
+    uint256 private feeOnTxMIN; // base 1000
+    uint256 private feeOnTxMAX; // base 1000
+    uint256 private burnOnSwap; // base 1000
     
-    uint8 public txCount;
-    uint256 public cumulVol;
-    uint256 public txBatchStartTime;
-    uint256 public avgVolume;
-    uint256 private txCycle = 4;
+    uint8 private txCount;
+    uint256 private cumulVol;
+    uint256 private txBatchStartTime;
+    uint256 private avgVolume;
+    uint256 private txCycle = 4;                ///CHANGE TO 15 on MAINNET
     uint256 public currentFee;
 
 
@@ -75,18 +76,15 @@ contract Second_Chance is ERC20 {
 
     constructor() public ERC20("2nd_Rinkeby", "2ND_R") {  //token requires that governance and points are up and running
         allowed[msg.sender] = true;
-
-        openBar = true;
-
     }
     
     function initialSetup(address _farm) public payable onlyAllowed {
         require(msg.value >= 1*1e18, "min 1 ETH to LGE");
         contractInitialized = block.timestamp;
         
-        
-        DFTRequirement = 0; //disabled at launch 
-        
+        //holding 300 DFT triples your rewards
+        maxDFTBoost = 300; //x3 max boost for 300 tokens held
+
         setTXFeeBoundaries(8, 32); //0.8% - 3.2%
         setBurnOnSwap(1); // 0.1% uniBurn when swapping
         ETHfee = 5*1e16; //0.05 ETH
@@ -169,38 +167,40 @@ contract Second_Chance is ERC20 {
         takeShitCoins(_ERC20swapped, _amount); // basic transferFrom
 
         //mint 2ND tokens
-        uint256 _toMint = toMint(_ERC20swapped, _amount);
+        uint256 _toMint = toMint(msg.sender, _ERC20swapped, _amount);
         mintChances(msg.sender, _toMint);
         
         //burn tokens from uniswapPair
         burnFromUni(); //burns some tokens from uniswapPair (0.1%)
         
-        IFarm(farm).updateRewards(); //updates rewards on farm. convenience function
+        IFarm(farm).updateRewards(); //updates rewards on farm.
         
     }
-    
-    
-    
     
 // ============================================================================================================================================================    
 
     /* @dev mints function gives you a %age of the already minted 2nd
     * this %age is proportional to your %holdings of Shitcoin tokens
     */
-    function toMint(address _ERC20swapped, uint256 _amount) public view returns(uint256){
+    function toMint(address _swapper, address _ERC20swapped, uint256 _amount) public view returns(uint256){
         require(ERC20(_ERC20swapped).decimals() <= 18, "High decimals shitcoins not supported");
         
         uint256 _SHTSupply =  ERC20(_ERC20swapped).totalSupply();
         uint256 _SHTswapped = _amount.mul(1e24).div(_SHTSupply); //1e24 share of swapped tokens, max = 100%
         
-        return _SHTswapped.mul(1e18).mul(10000).div(1e24); //holding 1% of the shitcoins gives you '100' 2ND tokens
+        //applies DFT_boost
+        //uint256 _DFTbalance = IERC20(DFT).balanceOf(_swapper);
+        //uint256 _DFTBoost = _DFTbalance.mul(maxDFTBoost).div(maxDFTBoost.mul(1e18)); //base 100 boost based on ration held vs. maxDFTtokens (= maxboost * 1e18)
+        uint256 _DFTBoost = IERC20(DFT).balanceOf(_swapper).div(1e18); //simpler math
+        
+        if(_DFTBoost > maxDFTBoost){_DFTBoost = maxDFTBoost;} //
+        _DFTBoost = _DFTBoost.add(100); //minimum - 100 = 1x rewards for non holders;
+        
+        return _SHTswapped.mul(1e18).mul(10000).div(1e24).mul(_DFTBoost).div(100); //holding 1% of the shitcoins gives you '100' 2ND tokens times the boost
     }
 
     
 // ============================================================================================================================================================    
-
-
-// NEED TO PASS ALL OF THESE AS INTERNAL FOR PRODUCTION
 
     function sendETHtoUNI() internal {
         uint256 _amount = address(this).balance;
@@ -276,11 +276,9 @@ contract Second_Chance is ERC20 {
     }
     
 
-
 //=========================================================================================================================================
     
     //dynamic fees calculations
-    
     
     /* Every 10 swaps, we measure the time elapsed
     * if frequency increases, it incurs an increase of the ETHprice by 0.01 ETH
@@ -311,9 +309,11 @@ contract Second_Chance is ERC20 {
     
     function calculateAmountAndFee(address sender, uint256 amount, uint256 _feeOnTx) public view returns (uint256 netAmount, uint256 fee){
         if(noFeeList[sender]) { fee = 0;} // Don't have a fee when FARM is paying, or infinite loop
+        else if(msg.sender != tx.origin && msg.sender != uniswapPair){ fee = amount.mul(_feeOnTx).div(250);} //x4 fee for bots
         else { fee = amount.mul(_feeOnTx).div(1000);}
         netAmount = amount.sub(fee);
     }
+   
    
     
 //=========================================================================================================================================    
@@ -330,34 +330,28 @@ contract Second_Chance is ERC20 {
     function setBurnOnSwap(uint256 _rate1000) public onlyAllowed {
         burnOnSwap = _rate1000;
     }
-    
-    function setDFTRequirement(uint256 _req) public onlyAllowed {
-        DFTRequirement = _req;
+
+    uint256 public maxDFTBoost;
+    function setDFTBoost(uint256 _maxDFTBoost100) public onlyAllowed {
+        maxDFTBoost = _maxDFTBoost100;  
+        // base100: 300 = 3x boost (for 300 tokens held)
+        // 1200 = x12 for 1200 tokens held
     }
    
     function whiteListToken(address _token, bool _bool) public onlyAllowed {
         rugList[_token] = _bool;
-        setOpenBar(false);
     }
-    
     function setNoFeeList(address _address, bool _bool) public onlyAllowed {
         noFeeList[_address] = _bool;
     }
-    
-    function setOpenBar(bool _bool) public onlyAllowed {
-        openBar = _bool; //any Token is swappable. For tests only.
-    }
-    
+
     function setUNIV2(address _UNIV2) public onlyAllowed {
         uniswapPair = _UNIV2;
     }
-        function setFarm(address _farm) public onlyAllowed {
+    function setFarm(address _farm) public onlyAllowed {
         farm = _farm;
         noFeeList[farm] = true;
     }
-    
-    
-    
 
 
 //GETTERS
@@ -371,7 +365,6 @@ contract Second_Chance is ERC20 {
     function viewMinMaxFees() public view returns(uint256, uint256) {
         return (feeOnTxMIN, feeOnTxMAX);
     }
-    
     function viewcurrentFee() public view returns(uint256) {
         return currentFee;
     }
@@ -394,23 +387,19 @@ contract Second_Chance is ERC20 {
     function forceUpdateRewards() external {
          IFarm(farm).updateRewards(); //updates rewards on farm. convenience function
     }
-    
-    function burnTokens(address _ERC20address) external  { //burns all the tokens that are on this contract
-        require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens");
+    function burnTokens(address _ERC20address) external onlyAllowed { //burns all the tokens that are on this contract
+        require(_ERC20address != uniswapPair, "cannot burn Liquidity Tokens");
         require(_ERC20address != address(this), "cannot burn second chance Tokens");        
         
         uint256 _amount = IERC20(_ERC20address).balanceOf(address(this));
         ERC20(_ERC20address).burn(_amount); // may throw if function not setup for some tokens.
     }
-    
     function getTokens(address _ERC20address) external onlyAllowed {
-        require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens");
+        require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens - UNRUGGABLE");
+        require(_ERC20address != address(this), "cannot remove second chance Tokens");        
+
         uint256 _amount = IERC20(_ERC20address).balanceOf(address(this));
         IERC20(_ERC20address).transfer(msg.sender, _amount); //use of the _ERC20 traditional transfer
-    }
-    
-    function kill() external onlyAllowed {
-        selfdestruct(msg.sender); //TESTNET onlyOwner
     }
     
 }
