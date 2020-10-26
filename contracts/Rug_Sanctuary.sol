@@ -173,6 +173,8 @@ contract Rug_Sanctuary {
         for (uint256 pid = 0; pid < length; ++pid) {
             allRewards = allRewards.add(updatePool(pid)); //calls updatePool(pid)
         }
+        
+        if(pendingRewards < allRewards){allRewards = pendingRewards;}
         pendingRewards = pendingRewards.sub(allRewards);
     }
     
