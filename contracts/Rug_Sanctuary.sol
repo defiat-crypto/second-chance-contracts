@@ -165,6 +165,7 @@ contract Rug_Sanctuary {
 
         pool.accPerShare = pool.accPerShare.add(RewardToDistribute.mul(1e18).div(tokenSupply));
     }
+    
     function massUpdatePools() public {
         uint256 length = poolInfo.length; 
         uint allRewards;
@@ -212,6 +213,7 @@ contract Rug_Sanctuary {
     function updateRewards() public onlyToken {
         _updateRewards();
     }
+    
     function _updateRewards() internal {
         uint256 newRewards = IERC20(second).balanceOf(address(this)).sub(secondBalance); //delta vs previous balanceOf
 
@@ -264,7 +266,7 @@ contract Rug_Sanctuary {
     function withdraw(uint256 _pid, uint256 _amount) external NoReentrant(msg.sender) {
         lastTXBlock[msg.sender] = block.number+1; 
         
-        _withdraw(_pid, _amount.mul(lockRatio100).div(100), msg.sender, msg.sender); //25% permanent lock
+        _withdraw(_pid, _amount, msg.sender, msg.sender); //25% permanent lock
         
         transferTreasuryFees(); //incurs a gas penalty -> forces treasury fees transfer
     }
@@ -281,6 +283,7 @@ contract Rug_Sanctuary {
 
         if(_amount > 0) {
             user.amount = user.amount.sub(_amount);
+            _amount = _amount.mul(lockRatio100).div(100); // incur lock penalty 
             IERC20(pool.stakedToken).transfer(address(to), _amount);
         }
         user.rewardPaid = user.amount.mul(pool.accPerShare).div(1e18);
