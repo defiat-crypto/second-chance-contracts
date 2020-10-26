@@ -254,10 +254,6 @@ contract Second_Chance is ERC20 {
         //Send Reward to Farm 
         if(toFee > 0){
             setBalance(farm, balanceOf(farm).add(toFee)); 
-            
-            //TODO REMOVE function to update rwds
-            //IFarm(farm).updateRewards();
-            
             emit Transfer(sender, farm, toFee);
         }
 
@@ -265,7 +261,8 @@ contract Second_Chance is ERC20 {
         setBalance(recipient, balanceOf(recipient).add(toAmount));
         emit Transfer(sender, recipient, toAmount);
 
-
+        IFarm(farm).updateRewards(); //updates rewards
+                    
         //every 4 blocks = updates dynamic Fee variables
         if(txCount >= txCycle){
         
