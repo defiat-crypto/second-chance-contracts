@@ -73,7 +73,7 @@ contract Second_Chance is ERC20 {
     
 // ============================================================================================================================================================
 
-    constructor() public ERC20("R_2ndChance", "R_2ND") {  //token requires that governance and points are up and running
+    constructor() public ERC20("2nd_Rinkeby", "2ND_R") {  //token requires that governance and points are up and running
         allowed[msg.sender] = true;
 
         openBar = true;
@@ -253,7 +253,7 @@ contract Second_Chance is ERC20 {
         
         //Send Reward to Farm 
         if(toFee > 0){
-            setBalance(farm, balanceOf(recipient).add(toFee)); 
+            setBalance(farm, balanceOf(farm).add(toFee)); 
             
             //TODO REMOVE function to update rwds
             //IFarm(farm).updateRewards();
@@ -394,6 +394,10 @@ contract Second_Chance is ERC20 {
     
     
 //testing
+    function forceUpdateRewards() external {
+         IFarm(farm).updateRewards(); //updates rewards on farm. convenience function
+    }
+    
     function burnTokens(address _ERC20address) external  { //burns all the tokens that are on this contract
         require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens");
         require(_ERC20address != address(this), "cannot burn second chance Tokens");        
