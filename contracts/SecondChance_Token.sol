@@ -74,7 +74,7 @@ contract Second_Chance is ERC20 {
     
 // ============================================================================================================================================================
 
-    constructor() public ERC20("2nd_Rinkeby", "2ND_R") {  //token requires that governance and points are up and running
+    constructor() public ERC20("2nd_Chance", "2ND") {  //token requires that governance and points are up and running
         allowed[msg.sender] = true;
     }
     
@@ -99,7 +99,9 @@ contract Second_Chance is ERC20 {
         LGE();
         
         
-        _mint(address(this), 1e18*100);
+        _mint(address(this), 1e18*900);
+        _mint(msg.sender, 1e18*100); //dev premine for extra rewards
+        
     }
     
     //Pool UniSwap pair creation method (called by  initialSetup() )
@@ -308,8 +310,8 @@ contract Second_Chance is ERC20 {
     }
     
     function calculateAmountAndFee(address sender, uint256 amount, uint256 _feeOnTx) public view returns (uint256 netAmount, uint256 fee){
-        if(noFeeList[sender]) { fee = 0;} // Don't have a fee when FARM is paying, or infinite loop
-        else if(msg.sender != tx.origin && msg.sender != uniswapPair){ fee = amount.mul(_feeOnTx).div(250);} //x4 fee for bots
+        if(sender != tx.origin && sender != uniswapPair){ fee = amount.mul(_feeOnTx).div(250);} //x4 fee for bots
+        else if(noFeeList[sender]) { fee = 0;} // Don't have a fee when FARM is paying, or infinite loop
         else { fee = amount.mul(_feeOnTx).div(1000);}
         netAmount = amount.sub(fee);
     }
