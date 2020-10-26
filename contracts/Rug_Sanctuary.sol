@@ -204,12 +204,15 @@ contract Rug_Sanctuary {
     *       updates the pendingRewards and the rewardsInThisEpoch variables
     */      
     modifier onlyToken() {
-        require(msg.sender == second);
+        require(msg.sender == second || ISecondChance(second).isAllowed(msg.sender));
         _;
     }
     
     uint256 private secondBalance;
-    function updateRewards() external onlyToken {
+    function updateRewards() public onlyToken {
+        _updateRewards();
+    }
+    function _updateRewards() internal {
         uint256 newRewards = IERC20(second).balanceOf(address(this)).sub(secondBalance); //delta vs previous balanceOf
 
         if(newRewards > 0) {
@@ -281,8 +284,9 @@ contract Rug_Sanctuary {
             IERC20(pool.stakedToken).transfer(address(to), _amount);
         }
         user.rewardPaid = user.amount.mul(pool.accPerShare).div(1e18);
-
         emit Withdraw(to, _pid, _amount);
+        
+        _updateRewards();
     }
 
     // Getter function to see pending rewards per user.
@@ -290,7 +294,7 @@ contract Rug_Sanctuary {
         PoolInfo storage pool = poolInfo[_pid];
         UserInfo storage user = userInfo[_pid][_user];
         uint256 accPerShare = pool.accPerShare;
-
+        
         return user.amount.mul(accPerShare).div(1e18).sub(user.rewardPaid);
     }
 
