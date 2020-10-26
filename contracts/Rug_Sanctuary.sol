@@ -221,6 +221,8 @@ contract Rug_Sanctuary {
             secondBalance =  IERC20(second).balanceOf(address(this)); //balance snapshot
             pendingRewards = pendingRewards.add(newRewards);
             rewardsInThisEpoch = rewardsInThisEpoch.add(newRewards);
+            
+            massUpdatePools; //updates rewards on farm. convenience function
         }
     }
 
