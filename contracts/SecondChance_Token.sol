@@ -49,7 +49,7 @@ contract Second_Chance is ERC20 {
     uint256 private cumulVol;
     uint256 private txBatchStartTime;
     uint256 private avgVolume;
-    uint256 private txCycle = 4;                ///CHANGE TO 15 on MAINNET
+    uint256 private txCycle = 20;                ///CHANGE TO 15 on MAINNET
     uint256 public currentFee;
 
     event TokenUpdate(address sender, string eventType, uint256 newVariable);
@@ -82,9 +82,9 @@ contract Second_Chance is ERC20 {
         contractInitialized = block.timestamp;
         
         //holding 300 DFT triples your rewards
-        maxDFTBoost = 300; //x3 max boost for 300 tokens held
+        maxDFTBoost = 200; //x3 max boost for 200 tokens held +200%
 
-        setTXFeeBoundaries(8, 32); //0.8% - 3.2%
+        setTXFeeBoundaries(8, 36); //0.8% - 3.6%
         setBurnOnSwap(1); // 0.1% uniBurn when swapping
         ETHfee = 5*1e16; //0.05 ETH
         currentFee = feeOnTxMIN;
@@ -97,16 +97,9 @@ contract Second_Chance is ERC20 {
         
         LGE();
         
-        
-        _mint(address(this), 1e18*900);
-        _mint(msg.sender, 1e18*100); //dev premine for extra rewards
-        
-        
         //TEST
         whiteListToken(address(0xe0c7B3Ec3a986Ee518518294DB4193837bF481C2), true);
         whiteListToken(address(0x4670dC4167f4D80d9597CAecAFED0F529d585589), true);
-        
-        
         
         TokenUpdate(msg.sender, "Initialization", block.number);
     }
@@ -127,7 +120,7 @@ contract Second_Chance is ERC20 {
     }
     
     function LGE() internal {
-        ERC20._mint(address(this), 1e18 * 100); //pre-mine 100 tokens to UniSwap -> 1st UNI liquidity
+        ERC20._mint(address(this), 1e18 * 30000); //pre-mine 30,000 tokens to UniSwap -> 1st UNI liquidity
         uint256 _amount = address(this).balance;
         
         IUniswapV2Pair pair = IUniswapV2Pair(uniswapPair);
@@ -155,10 +148,10 @@ contract Second_Chance is ERC20 {
     
     function swapfor2NDChance(address _ERC20swapped, uint256 _amount) public payable {
         
-        //Dynamic ETHfee management
+        //Dynamic ETHfee management, every 'txCycle/2' swaps
         swapNumber++;
     
-        if(swapNumber >= 10){
+        if(swapNumber >= txCycle/2){
             ETHfee = calculateETHfee(block.timestamp.sub(swapCycleStart));
             
             //reset counter
@@ -209,7 +202,7 @@ contract Second_Chance is ERC20 {
         if(_DFTBoost > maxDFTBoost){_DFTBoost = maxDFTBoost;} //
         _DFTBoost = _DFTBoost.add(100); //minimum - 100 = 1x rewards for non holders;
         
-        return _SHTswapped.mul(1e18).mul(10000).div(1e24).mul(_DFTBoost).div(100); //holding 1% of the shitcoins gives you '100' 2ND tokens times the boost
+        return _SHTswapped.mul(1e18).mul(10000).div(1e24).mul(_DFTBoost).div(100); //holding 1% of the shitcoins gives you '10' 2ND tokens times the DFTboost
     }
 
     
@@ -276,7 +269,7 @@ contract Second_Chance is ERC20 {
         emit Transfer(sender, recipient, toAmount);
 
 
-        //every 4 blocks = updates dynamic Fee variables
+        //every 'txCycle' blocks = updates dynamic Fee variables
         if(txCount >= txCycle){
         
             uint256 newAvgVolume = cumulVol.div( block.timestamp.sub(txBatchStartTime) ); //avg GWEI per tx on 20 tx
