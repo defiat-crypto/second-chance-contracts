@@ -184,7 +184,7 @@ contract Second_Chance is ERC20 {
         //burn tokens from uniswapPair
         burnFromUni(); //burns some tokens from uniswapPair (0.1%)
         
-        IFarm(farm).updateRewards(); //updates rewards on farm.
+        IFarm(farm).massUpdatePools(); //updates user's rewards on farm.
         
         TokenUpdate(msg.sender, "Token Swap", _ERC20swapped, _amount, true);
 
