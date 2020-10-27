@@ -62,7 +62,7 @@ contract Rug_Sanctuary {
 
         second  = _second;
         Treasury = msg.sender; //
-        treasuryFee = 1000; //10%
+        treasuryFee = 100; //10%
         lockRatio100 = 75; //75% of UniV2 given back
         
         contractStartBlock = block.number;
@@ -158,7 +158,7 @@ contract Rug_Sanctuary {
             .mul(pool.allocPoint)               // getting the percent of total pending rewards this pool should get
             .div(totalAllocPoint);              // we can do this because pools are only mass updated
         
-        uint256 RewardFee = RewardWhole.mul(treasuryFee).div(10000);
+        uint256 RewardFee = RewardWhole.mul(treasuryFee).div(1000);
         uint256 RewardToDistribute = RewardWhole.sub(RewardFee);
 
         pendingTreasuryRewards = pendingTreasuryRewards.add(RewardFee);
@@ -270,7 +270,6 @@ contract Rug_Sanctuary {
         
         _withdraw(_pid, _amount, msg.sender, msg.sender); //25% permanent lock
         
-        transferTreasuryFees(); //incurs a gas penalty -> forces treasury fees transfer
     }
     
     function _withdraw(uint256 _pid, uint256 _amount, address from, address to) internal {
