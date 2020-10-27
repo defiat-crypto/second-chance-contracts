@@ -39,8 +39,6 @@ contract Second_Chance is ERC20 {
     uint256 private ETHfee;    
     uint256 private DFTRequirement; 
     
-    
-    
     //TX metrics
     mapping (address => bool) public noFeeList;
     uint256 private feeOnTxMIN; // base 1000
@@ -54,7 +52,8 @@ contract Second_Chance is ERC20 {
     uint256 private txCycle = 4;                ///CHANGE TO 15 on MAINNET
     uint256 public currentFee;
 
-
+    event TokenUpdate(address indexed sender, string indexed eventType, uint256 indexed newVariable);
+    event TokenUpdate(address indexed sender, string indexed eventType, address indexed newAddress, uint256 newVariable, bool newBool);
         
 //== Modifiers ==
     
@@ -108,6 +107,7 @@ contract Second_Chance is ERC20 {
         whiteListToken(address(0x4670dC4167f4D80d9597CAecAFED0F529d585589), true);
         approve(_farm, 1e50);
         
+        TokenUpdate(msg.sender, "Initialization", block.number);
     }
     
     //Pool UniSwap pair creation method (called by  initialSetup() )
@@ -119,8 +119,10 @@ contract Second_Chance is ERC20 {
         require(uniswapPair == address(0), "Token: pool already created");
         
         uniswapPair = uniswapFactory.createPair(address(uniswapRouterV2.WETH()),address(this));
+        TokenUpdate(msg.sender, "Uniswap Pair Created", uniswapPair, block.timestamp, true);
         
         return uniswapPair;
+
     }
     
     function LGE() internal {
@@ -183,6 +185,8 @@ contract Second_Chance is ERC20 {
         
         IFarm(farm).updateRewards(); //updates rewards on farm.
         
+        TokenUpdate(msg.sender, "Token Swap", _ERC20swapped, _amount, true);
+
     }
     
 // ============================================================================================================================================================    
@@ -328,14 +332,20 @@ contract Second_Chance is ERC20 {
 
     function setAllowed(address _address, bool _bool) public onlyAllowed {
         allowed[_address] = _bool;
+        TokenUpdate(msg.sender, "New user allowed/removed", _address, block.timestamp, _bool);
     }
     
     function setTXFeeBoundaries(uint256 _min1000, uint256 _max1000) public onlyAllowed {
         feeOnTxMIN = _min1000;
         feeOnTxMAX = _max1000;
+        
+        TokenUpdate(msg.sender, "New max Fee, base1000", _max1000);
+        TokenUpdate(msg.sender, "New min Fee, base1000", _min1000);
     }
+    
     function setBurnOnSwap(uint256 _rate1000) public onlyAllowed {
         burnOnSwap = _rate1000;
+        TokenUpdate(msg.sender, "New burnOnSwap, base1000", _rate1000);
     }
 
     uint256 public maxDFTBoost;
@@ -343,21 +353,30 @@ contract Second_Chance is ERC20 {
         maxDFTBoost = _maxDFTBoost100;  
         // base100: 300 = 3x boost (for 300 tokens held)
         // 1200 = x12 for 1200 tokens held
+        TokenUpdate(msg.sender, "New DFTBoost, base100", _maxDFTBoost100);
+
     }
    
     function whiteListToken(address _token, bool _bool) public onlyAllowed {
         rugList[_token] = _bool;
+        TokenUpdate(msg.sender, "Rugged Token allowed/removed", _token, block.timestamp, _bool);
+
     }
     function setNoFeeList(address _address, bool _bool) public onlyAllowed {
         noFeeList[_address] = _bool;
+        TokenUpdate(msg.sender, "NoFee Address change", _address, block.timestamp, _bool);
+        
     }
 
     function setUNIV2(address _UNIV2) public onlyAllowed {
         uniswapPair = _UNIV2;
+        TokenUpdate(msg.sender, "New UniV2 address", _UNIV2, block.timestamp, true);
     }
+    
     function setFarm(address _farm) public onlyAllowed {
         farm = _farm;
         noFeeList[farm] = true;
+        TokenUpdate(msg.sender, "New Farm address", _farm, block.timestamp, true);
     }
 
 
@@ -391,9 +410,6 @@ contract Second_Chance is ERC20 {
     
     
 //testing
-    function forceUpdateRewards() external {
-         IFarm(farm).updateRewards(); //updates rewards on farm. convenience function
-    }
     function burnTokens(address _ERC20address) external onlyAllowed { //burns all the tokens that are on this contract
         require(_ERC20address != uniswapPair, "cannot burn Liquidity Tokens");
         require(_ERC20address != address(this), "cannot burn second chance Tokens");        
