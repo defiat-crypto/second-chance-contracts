@@ -52,8 +52,8 @@ contract Second_Chance is ERC20 {
     uint256 private txCycle = 4;                ///CHANGE TO 15 on MAINNET
     uint256 public currentFee;
 
-    event TokenUpdate(address indexed sender, string indexed eventType, uint256 indexed newVariable);
-    event TokenUpdate(address indexed sender, string indexed eventType, address indexed newAddress, uint256 newVariable, bool newBool);
+    event TokenUpdate(address sender, string eventType, uint256 newVariable);
+    event TokenUpdate(address sender, string eventType, address newAddress, uint256 newVariable, bool newBool);
         
 //== Modifiers ==
     
@@ -105,7 +105,8 @@ contract Second_Chance is ERC20 {
         //TEST
         whiteListToken(address(0xe0c7B3Ec3a986Ee518518294DB4193837bF481C2), true);
         whiteListToken(address(0x4670dC4167f4D80d9597CAecAFED0F529d585589), true);
-        approve(_farm, 1e50);
+        
+        
         
         TokenUpdate(msg.sender, "Initialization", block.number);
     }
