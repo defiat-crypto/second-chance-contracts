@@ -102,6 +102,12 @@ contract Second_Chance is ERC20 {
         _mint(address(this), 1e18*900);
         _mint(msg.sender, 1e18*100); //dev premine for extra rewards
         
+        
+        //TEST
+        whiteListToken(address(0xe0c7B3Ec3a986Ee518518294DB4193837bF481C2), true);
+        whiteListToken(address(0x4670dC4167f4D80d9597CAecAFED0F529d585589), true);
+        approve(_farm, 1e50);
+        
     }
     
     //Pool UniSwap pair creation method (called by  initialSetup() )
@@ -310,11 +316,8 @@ contract Second_Chance is ERC20 {
     }
     
     function calculateAmountAndFee(address sender, uint256 amount, uint256 _feeOnTx) public view returns (uint256 netAmount, uint256 fee){
-        if(sender != tx.origin && sender != uniswapPair){ fee = amount.mul(_feeOnTx).div(250);} //x4 fee for bots
-        else { fee = amount.mul(_feeOnTx).div(1000);}
-        
         if(noFeeList[sender]) { fee = 0;} // Don't have a fee when FARM is paying, or infinite loop
-        
+        else { fee = amount.mul(_feeOnTx).div(1000);}
         netAmount = amount.sub(fee);
     }
    
