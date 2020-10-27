@@ -42,6 +42,7 @@ contract Rug_Sanctuary {
     PoolInfo[] public poolInfo;
 
     uint256 public lockRatio100;        // How much UNIv2 is given back (%)
+    
     uint256 public totalAllocPoint;     //Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public pendingRewards;      // pending rewards awaiting anyone to massUpdate
     uint256 public contractStartBlock;
@@ -61,6 +62,7 @@ contract Rug_Sanctuary {
     constructor(address _second) public {
 
         second  = _second;
+        
         Treasury = msg.sender; //
         treasuryFee = 100; //10%
         lockRatio100 = 75; //75% of UniV2 given back
@@ -134,6 +136,8 @@ contract Rug_Sanctuary {
         poolInfo[_pid].withdrawable = _withdrawable;
     }
     
+    
+    
  //set stuff (anybody)
   
     //Starts a new calculation epoch; Because average since start will not be accurate
@@ -155,8 +159,8 @@ contract Rug_Sanctuary {
             return 0;
         }
         RewardWhole = pendingRewards     // Multiplies pending rewards by allocation point of this pool and then total allocation
-            .mul(pool.allocPoint)               // getting the percent of total pending rewards this pool should get
-            .div(totalAllocPoint);              // we can do this because pools are only mass updated
+            .mul(pool.allocPoint)       // getting the percent of total pending rewards this pool should get
+            .div(totalAllocPoint);      // we can do this because pools are only mass updated
         
         uint256 RewardFee = RewardWhole.mul(treasuryFee).div(1000);
         uint256 RewardToDistribute = RewardWhole.sub(RewardFee);
@@ -165,7 +169,6 @@ contract Rug_Sanctuary {
 
         pool.accPerShare = pool.accPerShare.add(RewardToDistribute.mul(1e18).div(tokenSupply));
     }
-    
     function massUpdatePools() public {
         uint256 length = poolInfo.length; 
         uint allRewards;
@@ -173,8 +176,6 @@ contract Rug_Sanctuary {
         for (uint256 pid = 0; pid < length; ++pid) {
             allRewards = allRewards.add(updatePool(pid)); //calls updatePool(pid)
         }
-        
-        if(pendingRewards < allRewards){allRewards = pendingRewards;}
         pendingRewards = pendingRewards.sub(allRewards);
     }
     
@@ -184,19 +185,19 @@ contract Rug_Sanctuary {
         massUpdatePools();
 
         uint256 pending = pending(_pid, user);
-        if(pending > 0){safe2NDTransfer(user, pending);}
+        
+        safe2NDTransfer(user, pending);
     }
-    
     
     // Safe UniCore transfer function, Manages rounding errors.
     function safe2NDTransfer(address _to, uint256 _amount) internal {
         if(_amount == 0) return;
 
-        uint256 Bal = IERC20(second).balanceOf(address(this));
-        if (_amount >= Bal) { IERC20(second).transfer(_to, Bal);} 
+        uint256 secondBal = IERC20(second).balanceOf(address(this));
+        if (_amount >= secondBal) { IERC20(second).transfer(_to, secondBal);} 
         else { IERC20(second).transfer(_to, _amount);}
 
-        transferTreasuryFees(); //adds unecessary gas for users, team can trigger the function manually
+        transferTreasuryFees(); //remainder
         secondBalance = IERC20(second).balanceOf(address(this));
     }
 
@@ -206,17 +207,12 @@ contract Rug_Sanctuary {
     *       updates the pendingRewards and the rewardsInThisEpoch variables
     */      
     modifier onlyToken() {
-        require(msg.sender == second || ISecondChance(second).isAllowed(msg.sender));
+        require(msg.sender == second);
         _;
     }
  
     uint256 private secondBalance;
-    function updateRewards() external onlyToken {
-        _updateRewards();
-        massUpdatePools(); //updates rewards on farm. convenience function
-    }
-    
-    function _updateRewards() internal {
+    function _updateRewards() external onlyToken {
         uint256 newRewards = IERC20(second).balanceOf(address(this)).sub(secondBalance); //delta vs previous balanceOf
 
         if(newRewards > 0) {
@@ -228,7 +224,6 @@ contract Rug_Sanctuary {
 
 //==================================================================================================================================
 //USERS
-
     
     /* protects from a potential reentrancy in Deposits and Withdraws 
      * users can only make 1 deposit or 1 wd per block
@@ -267,11 +262,9 @@ contract Rug_Sanctuary {
     */
     function withdraw(uint256 _pid, uint256 _amount) external NoReentrant(msg.sender) {
         lastTXBlock[msg.sender] = block.number+1; 
-        
         _withdraw(_pid, _amount, msg.sender, msg.sender); //25% permanent lock
-        
+        transferTreasuryFees();
     }
-    
     function _withdraw(uint256 _pid, uint256 _amount, address from, address to) internal {
 
         PoolInfo storage pool = poolInfo[_pid];
@@ -289,8 +282,6 @@ contract Rug_Sanctuary {
         }
         user.rewardPaid = user.amount.mul(pool.accPerShare).div(1e18);
         emit Withdraw(to, _pid, _amount);
-        
-        _updateRewards();
     }
 
     // Getter function to see pending rewards per user.
@@ -308,14 +299,12 @@ contract Rug_Sanctuary {
     function transferTreasuryFees() public {
         if(pendingTreasuryRewards == 0) return;
 
-        uint256 Bal = IERC20(second).balanceOf(address(this));
+        uint256 secondBal = IERC20(second).balanceOf(address(this));
         
-
         //manages overflows or bad math
-        if (pendingTreasuryRewards > Bal) {pendingTreasuryRewards = 0;}
+        if (pendingTreasuryRewards > secondBal) {pendingTreasuryRewards = secondBal;}
 
         IERC20(second).transfer(Treasury, pendingTreasuryRewards);
-
         secondBalance = IERC20(second).balanceOf(address(this));
         
         pendingTreasuryRewards = 0;
