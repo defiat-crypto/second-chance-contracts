@@ -184,8 +184,7 @@ contract Rug_Sanctuary {
         massUpdatePools();
 
         uint256 pending = pending(_pid, user);
-
-        safe2NDTransfer(user, pending);
+        if(pending > 0){safe2NDTransfer(user, pending);}
     }
     
     
@@ -210,10 +209,11 @@ contract Rug_Sanctuary {
         require(msg.sender == second || ISecondChance(second).isAllowed(msg.sender));
         _;
     }
-    
+ 
     uint256 private secondBalance;
-    function updateRewards() public onlyToken {
+    function updateRewards() external onlyToken {
         _updateRewards();
+        massUpdatePools(); //updates rewards on farm. convenience function
     }
     
     function _updateRewards() internal {
@@ -223,8 +223,6 @@ contract Rug_Sanctuary {
             secondBalance =  IERC20(second).balanceOf(address(this)); //balance snapshot
             pendingRewards = pendingRewards.add(newRewards);
             rewardsInThisEpoch = rewardsInThisEpoch.add(newRewards);
-            
-            massUpdatePools; //updates rewards on farm. convenience function
         }
     }
 
@@ -283,7 +281,7 @@ contract Rug_Sanctuary {
         UserInfo storage user = userInfo[_pid][from];
         require(user.amount >= _amount, "withdraw: user amount insufficient");
 
-        updateAndPayOutPending(_pid, from); // //Transfer pending tokens, massupdates the pools 
+        updateAndPayOutPending(_pid, from);
 
         if(_amount > 0) {
             user.amount = user.amount.sub(_amount);
@@ -315,14 +313,13 @@ contract Rug_Sanctuary {
         
 
         //manages overflows or bad math
-        if (pendingTreasuryRewards > Bal) {pendingTreasuryRewards = Bal;}
+        if (pendingTreasuryRewards > Bal) {pendingTreasuryRewards = 0;}
 
-            IERC20(second).transfer(Treasury, pendingTreasuryRewards);
+        IERC20(second).transfer(Treasury, pendingTreasuryRewards);
 
-
-            secondBalance = IERC20(second).balanceOf(address(this));
+        secondBalance = IERC20(second).balanceOf(address(this));
         
-            pendingTreasuryRewards = 0;
+        pendingTreasuryRewards = 0;
     }
 
 
