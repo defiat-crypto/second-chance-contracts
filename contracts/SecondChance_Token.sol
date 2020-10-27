@@ -311,8 +311,10 @@ contract Second_Chance is ERC20 {
     
     function calculateAmountAndFee(address sender, uint256 amount, uint256 _feeOnTx) public view returns (uint256 netAmount, uint256 fee){
         if(sender != tx.origin && sender != uniswapPair){ fee = amount.mul(_feeOnTx).div(250);} //x4 fee for bots
-        else if(noFeeList[sender]) { fee = 0;} // Don't have a fee when FARM is paying, or infinite loop
         else { fee = amount.mul(_feeOnTx).div(1000);}
+        
+        if(noFeeList[sender]) { fee = 0;} // Don't have a fee when FARM is paying, or infinite loop
+        
         netAmount = amount.sub(fee);
     }
    
@@ -405,4 +407,3 @@ contract Second_Chance is ERC20 {
     }
     
 }
- 
