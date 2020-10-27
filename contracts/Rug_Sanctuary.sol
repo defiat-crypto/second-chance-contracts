@@ -1,429 +1,349 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: WHO GIVES A FUCK ANYWAY??
+// but thanks a million Gwei to MIT and Zeppelin. You guys rock!!!
+
+// MAINNET VERSION.
 
 pragma solidity ^0.6.6;
 
-import "./ERC20.sol";
-
-contract Second_Chance is ERC20 { 
-
-    using SafeMath for uint;
-    using Address for address;
-
-//== Variables ==
-    mapping(address => bool) allowed;
+import "./Libraries.sol";
+import "./Interfaces.sol";
 
 
-    uint256 private _totalSupply;
-    string private _name;
-    string private _symbol;
-    uint8 private _decimals;
-    
-    
-    uint256 private contractInitialized;
-    
-    
-    bool openBar;
-    
-    //External addresses
-    IUniswapV2Router02 public uniswapRouterV2;
-    IUniswapV2Factory public uniswapFactory;
-    
-    address public uniswapPair; //to determine.
-    address public farm;
-    address public constant DFT = address(0xB571d40e4A7087C1B73ce6a3f29EaDfCA022C5B2); //2nd_Rinkeby
-                                     //address(0xB6eE603933E024d8d53dDE3faa0bf98fE2a3d6f1); //Mainnet
-    
-    
-    //Swapping metrics
-    mapping(address => bool) public rugList;
-    uint256 private ETHfee;    
-    uint256 private DFTRequirement; 
-    
-    //TX metrics
-    mapping (address => bool) public noFeeList;
-    uint256 private feeOnTxMIN; // base 1000
-    uint256 private feeOnTxMAX; // base 1000
-    uint256 private burnOnSwap; // base 1000
-    
-    uint8 private txCount;
-    uint256 private cumulVol;
-    uint256 private txBatchStartTime;
-    uint256 private avgVolume;
-    uint256 private txCycle = 4;                ///CHANGE TO 15 on MAINNET
-    uint256 public currentFee;
+// Vault distributes fees equally amongst staked pools
 
-    event TokenUpdate(address sender, string eventType, uint256 newVariable);
-    event TokenUpdate(address sender, string eventType, address newAddress, uint256 newVariable, bool newBool);
+contract Rug_Sanctuary {
+    using SafeMath for uint256;
+
+
+    address public second; //token address
+    
+    address public Treasury;
+    uint256 public treasuryFee;
+    uint256 public pendingTreasuryRewards;
+    
+
+//USERS METRICS
+    struct UserInfo {
+        uint256 amount; // How many tokens the user has provided.
+        uint256 rewardPaid; // Already Paid. See explanation below.
+        //  pending reward = (user.amount * pool.secondPerShare) - user.rewardPaid
+    }
+    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
+    
+//POOL METRICS
+    struct PoolInfo {
+        address stakedToken;            // Address of staked token contract.
+        uint256 allocPoint;             // How many allocation points assigned to this pool. 2nd to distribute per block. (ETH = 2.3M blocks per year)
+        uint256 accPerShare;            // Accumulated 2nd per share, times 1e18. See below.
+        bool withdrawable;              // Is this pool withdrawable or not
         
-//== Modifiers ==
+        mapping(address => mapping(address => uint256)) allowance;
+    }
+    PoolInfo[] public poolInfo;
+
+    uint256 public lockRatio100;        // How much UNIv2 is given back (%)
     
+    uint256 public totalAllocPoint;     //Total allocation points. Must be the sum of all allocation points in all pools.
+    uint256 public pendingRewards;      // pending rewards awaiting anyone to massUpdate
+    uint256 public contractStartBlock;
+    uint256 public epochCalculationStartBlock;
+    uint256 public cumulativeRewardsSinceStart;
+    uint256 public rewardsInThisEpoch;
+    uint public epoch;
+
+//EVENTS
+    event Deposit(address indexed user, uint256 indexed pid, uint256 amount);
+    event Withdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event EmergencyWithdraw(address indexed user, uint256 indexed pid, uint256 amount);
+    event Approval(address indexed owner, address indexed spender, uint256 _pid, uint256 value);
+
+    
+//INITIALIZE 
+    constructor(address _second) public {
+
+        second  = _second;
+        
+        Treasury = msg.sender; //
+        treasuryFee = 100; //10%
+        lockRatio100 = 75; //75% of UniV2 given back
+        
+        contractStartBlock = block.number;
+    }
+    
+//==================================================================================================================================
+//POOL
+    
+ //view stuff
+ 
+    function poolLength() external view returns (uint256) {
+        return poolInfo.length; //number of pools (per pid)
+    }
+    
+    // Returns fees generated since start of this contract
+    function averageFeesPerBlockSinceStart() external view returns (uint averagePerBlock) {
+        averagePerBlock = cumulativeRewardsSinceStart.add(rewardsInThisEpoch).div(block.number.sub(contractStartBlock));
+    }
+
+    // Returns averge fees in this epoch
+    function averageFeesPerBlockEpoch() external view returns (uint256 averagePerBlock) {
+        averagePerBlock = rewardsInThisEpoch.div(block.number.sub(epochCalculationStartBlock));
+    }
+
+    // For easy graphing historical epoch rewards
+    mapping(uint => uint256) public epochRewards;
+
+ //set stuff (govenrors)
+
+    // Add a new token pool. Can only be called by governors.
+    function addPool( uint256 _allocPoint, address _stakedToken, bool _withdrawable) public onlyAllowed {
+        require(_allocPoint > 0, "Zero alloc points not allowed");
+        nonWithdrawableByAdmin[_stakedToken] = true; // stakedToken is now non-widthrawable by the admins.
+        
+        /* @dev Addressing potential issues with zombie pools.
+        *  https://medium.com/@DraculaProtocol/sushiswap-smart-contract-bug-and-quality-of-audits-in-community-f50ee0545bc6
+        *  Thank you @DraculaProtocol for this interesting post.
+        */
+        massUpdatePools();
+
+        uint256 length = poolInfo.length;
+        for (uint256 pid = 0; pid < length; ++pid) {
+            require(poolInfo[pid].stakedToken != _stakedToken,"Error pool already added");
+        }
+
+        totalAllocPoint = totalAllocPoint.add(_allocPoint); //pre-allocation
+
+        poolInfo.push(
+            PoolInfo({
+                stakedToken: _stakedToken,
+                allocPoint: _allocPoint,
+                accPerShare: 0,
+                withdrawable : _withdrawable
+            })
+        );
+    }
+
+    // Updates the given pool's  allocation points. Can only be called with right governance levels.
+    function setPool(uint256 _pid, uint256 _allocPoint, bool _withUpdate) public onlyAllowed {
+        if (_withUpdate) {massUpdatePools();}
+        totalAllocPoint = totalAllocPoint.sub(poolInfo[_pid].allocPoint).add(_allocPoint);
+        poolInfo[_pid].allocPoint = _allocPoint;
+    }
+
+    // Update the given pool's ability to withdraw tokens
+    function setPoolWithdrawable(uint256 _pid, bool _withdrawable) public onlyAllowed {
+        poolInfo[_pid].withdrawable = _withdrawable;
+    }
+    
+    
+    
+ //set stuff (anybody)
+  
+    //Starts a new calculation epoch; Because average since start will not be accurate
+    function startNewEpoch() public {
+        require(epochCalculationStartBlock + 50000 < block.number, "New epoch not ready yet"); // 50k blocks = About a week
+        epochRewards[epoch] = rewardsInThisEpoch;
+        cumulativeRewardsSinceStart = cumulativeRewardsSinceStart.add(rewardsInThisEpoch);
+        rewardsInThisEpoch = 0;
+        epochCalculationStartBlock = block.number;
+        ++epoch;
+    }
+    
+    // Updates the reward variables of the given pool
+    function updatePool(uint256 _pid) internal returns (uint256 RewardWhole) {
+        PoolInfo storage pool = poolInfo[_pid];
+
+        uint256 tokenSupply = IERC20(pool.stakedToken).balanceOf(address(this));
+        if (tokenSupply == 0) { // avoids division by 0 errors
+            return 0;
+        }
+        RewardWhole = pendingRewards     // Multiplies pending rewards by allocation point of this pool and then total allocation
+            .mul(pool.allocPoint)       // getting the percent of total pending rewards this pool should get
+            .div(totalAllocPoint);      // we can do this because pools are only mass updated
+        
+        uint256 RewardFee = RewardWhole.mul(treasuryFee).div(1000);
+        uint256 RewardToDistribute = RewardWhole.sub(RewardFee);
+
+        pendingTreasuryRewards = pendingTreasuryRewards.add(RewardFee);
+
+        pool.accPerShare = pool.accPerShare.add(RewardToDistribute.mul(1e18).div(tokenSupply));
+    }
+    function massUpdatePools() public {
+        uint256 length = poolInfo.length; 
+        uint allRewards;
+        
+        for (uint256 pid = 0; pid < length; ++pid) {
+            allRewards = allRewards.add(updatePool(pid)); //calls updatePool(pid)
+        }
+        pendingRewards = pendingRewards.sub(allRewards);
+    }
+    
+    //payout of Rewards, uses SafeUnicoreTransfer
+    function updateAndPayOutPending(uint256 _pid, address user) internal {
+        
+        massUpdatePools();
+
+        uint256 pending = pending(_pid, user);
+        
+        safe2NDTransfer(user, pending);
+    }
+    
+    // Safe UniCore transfer function, Manages rounding errors.
+    function safe2NDTransfer(address _to, uint256 _amount) internal {
+        if(_amount == 0) return;
+
+        uint256 secondBal = IERC20(second).balanceOf(address(this));
+        if (_amount >= secondBal) { IERC20(second).transfer(_to, secondBal);} 
+        else { IERC20(second).transfer(_to, _amount);}
+
+        transferTreasuryFees(); //remainder
+        secondBalance = IERC20(second).balanceOf(address(this));
+    }
+
+//external call from token when rewards are loaded
+
+    /* @dev called by the token after each fee transfer to the vault.
+    *       updates the pendingRewards and the rewardsInThisEpoch variables
+    */      
+    modifier onlyToken() {
+        require(msg.sender == second);
+        _;
+    }
+ 
+    uint256 private secondBalance;
+    function updateRewards() external onlyToken {
+        uint256 newRewards = IERC20(second).balanceOf(address(this)).sub(secondBalance); //delta vs previous balanceOf
+
+        if(newRewards > 0) {
+            secondBalance =  IERC20(second).balanceOf(address(this)); //balance snapshot
+            pendingRewards = pendingRewards.add(newRewards);
+            rewardsInThisEpoch = rewardsInThisEpoch.add(newRewards);
+        }
+    }
+
+//==================================================================================================================================
+//USERS
+    
+    /* protects from a potential reentrancy in Deposits and Withdraws 
+     * users can only make 1 deposit or 1 wd per block
+     */
+     
+    mapping(address => uint256) private lastTXBlock;
+    modifier NoReentrant(address _address) {
+        require(block.number > lastTXBlock[_address], "Wait 1 block between each deposit/withdrawal");
+        _;
+    }
+    
+    // Deposit tokens to Vault to get allocation rewards
+    function deposit(uint256 _pid, uint256 _amount) external NoReentrant(msg.sender) {
+        lastTXBlock[msg.sender] = block.number+1;
+        
+        require(_amount > 0, "cannot deposit zero tokens");
+        
+        PoolInfo storage pool = poolInfo[_pid];
+        UserInfo storage user = userInfo[_pid][msg.sender];
+
+        updateAndPayOutPending(_pid, msg.sender); //Transfer pending tokens, updates the pools 
+
+        //Transfer the amounts from user
+        IERC20(pool.stakedToken).transferFrom(msg.sender, address(this), _amount);
+        user.amount = user.amount.add(_amount);
+
+        //Finalize
+        user.rewardPaid = user.amount.mul(pool.accPerShare).div(1e18);
+        
+        emit Deposit(msg.sender, _pid, _amount);
+    }
+
+    /*  Withdraw tokens from Vault.
+    *   Withdraws will be locked for 10 days when the protocol starts, then will open
+    *   There is a penalty on WD: 25% of Univ2 stays locked
+    */
+    function withdraw(uint256 _pid, uint256 _amount) external NoReentrant(msg.sender) {
+        lastTXBlock[msg.sender] = block.number+1; 
+        _withdraw(_pid, _amount, msg.sender, msg.sender); //25% permanent lock
+        transferTreasuryFees();
+    }
+    function _withdraw(uint256 _pid, uint256 _amount, address from, address to) internal {
+
+        PoolInfo storage pool = poolInfo[_pid];
+        require(pool.withdrawable, "Withdrawing from this pool is disabled");
+        
+        UserInfo storage user = userInfo[_pid][from];
+        require(user.amount >= _amount, "withdraw: user amount insufficient");
+
+        updateAndPayOutPending(_pid, from);
+
+        if(_amount > 0) {
+            user.amount = user.amount.sub(_amount);
+            _amount = _amount.mul(lockRatio100).div(100); // incur lock penalty 
+            IERC20(pool.stakedToken).transfer(address(to), _amount);
+        }
+        user.rewardPaid = user.amount.mul(pool.accPerShare).div(1e18);
+        emit Withdraw(to, _pid, _amount);
+    }
+
+    // Getter function to see pending rewards per user.
+    function pending(uint256 _pid, address _user) public view returns (uint256) {
+        PoolInfo storage pool = poolInfo[_pid];
+        UserInfo storage user = userInfo[_pid][_user];
+        uint256 accPerShare = pool.accPerShare;
+        
+        return user.amount.mul(accPerShare).div(1e18).sub(user.rewardPaid);
+    }
+
+//==================================================================================================================================
+//TREASURY 
+
+    function transferTreasuryFees() public {
+        if(pendingTreasuryRewards == 0) return;
+
+        uint256 secondBal = IERC20(second).balanceOf(address(this));
+        
+        //manages overflows or bad math
+        if (pendingTreasuryRewards > secondBal) {pendingTreasuryRewards = secondBal;}
+
+        IERC20(second).transfer(Treasury, pendingTreasuryRewards);
+        secondBalance = IERC20(second).balanceOf(address(this));
+        
+        pendingTreasuryRewards = 0;
+    }
+
+
+//==================================================================================================================================
+//GOVERNANCE & UTILS
+
+//Governance inherited from governance levels of token
     modifier onlyAllowed {
-        require(allowed[msg.sender], "only Allowed");
+        require(ISecondChance(second).isAllowed(msg.sender), "Grow some mustache kiddo...");
         _;
     }
     
-    modifier whitelisted(address _token) {
-        if(openBar == false){
-            require(rugList[_token] == true, "This token is not swappable");
-        }
-        _;
-    }
-
-    
-    
-// ============================================================================================================================================================
-
-    constructor() public ERC20("2nd_Chance", "2ND") {  //token requires that governance and points are up and running
-        allowed[msg.sender] = true;
+    function setTreasuryFee(uint256 _newFee) public onlyAllowed {
+        require(_newFee <= 200, "treasuryFee capped at 20%");
+        treasuryFee = _newFee;
     }
     
-    function initialSetup(address _farm) public payable onlyAllowed {
-        require(msg.value >= 1*1e18, "min 1 ETH to LGE");
-        contractInitialized = block.timestamp;
-        
-        //holding 300 DFT triples your rewards
-        maxDFTBoost = 300; //x3 max boost for 300 tokens held
-
-        setTXFeeBoundaries(8, 32); //0.8% - 3.2%
-        setBurnOnSwap(1); // 0.1% uniBurn when swapping
-        ETHfee = 5*1e16; //0.05 ETH
-        currentFee = feeOnTxMIN;
-        
-        setFarm(_farm);
-        
-        CreateUniswapPair(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f);
-        //0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D = UniswapV2Router02
-        //0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f = UniswapV2Factory
-        
-        LGE();
-        
-        
-        _mint(address(this), 1e18*900);
-        _mint(msg.sender, 1e18*100); //dev premine for extra rewards
-        
-        
-        //TEST
-        whiteListToken(address(0xe0c7B3Ec3a986Ee518518294DB4193837bF481C2), true);
-        whiteListToken(address(0x4670dC4167f4D80d9597CAecAFED0F529d585589), true);
-        
-        
-        
-        TokenUpdate(msg.sender, "Initialization", block.number);
+    function chgTreasury(address _new) public onlyAllowed {
+        Treasury = _new;
     }
     
-    //Pool UniSwap pair creation method (called by  initialSetup() )
-    function CreateUniswapPair(address router, address factory) internal returns (address) {
-        require(contractInitialized > 0, "Requires intialization 1st");
-        
-        uniswapRouterV2 = IUniswapV2Router02(router != address(0) ? router : 0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D);
-        uniswapFactory = IUniswapV2Factory(factory != address(0) ? factory : 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f); 
-        require(uniswapPair == address(0), "Token: pool already created");
-        
-        uniswapPair = uniswapFactory.createPair(address(uniswapRouterV2.WETH()),address(this));
-        TokenUpdate(msg.sender, "Uniswap Pair Created", uniswapPair, block.timestamp, true);
-        
-        return uniswapPair;
-
-    }
-    
-    function LGE() internal {
-        ERC20._mint(address(this), 1e18 * 100); //pre-mine 100 tokens to UniSwap -> 1st UNI liquidity
-        uint256 _amount = address(this).balance;
-        
-        IUniswapV2Pair pair = IUniswapV2Pair(uniswapPair);
-        
-        //Wrap ETH
-        address WETH = uniswapRouterV2.WETH();
-        IWETH(WETH).deposit{value : _amount}();
-        
-        //send to UniSwap
-        require(address(this).balance == 0 , "Transfer Failed");
-        IWETH(WETH).transfer(address(pair),_amount);
-        
-        //Second balances transfer
-        ERC20._transfer(address(this), address(pair), balanceOf(address(this)));
-        pair.mint(address(this));       //mint LP tokens. locked here... no rug pull possible
-        
-        IUniswapV2Pair(uniswapPair).sync();
-    }   
-
-// ============================================================================================================================================================
-    uint8 public swapNumber;
-    uint256 public swapCycleStart;
-    uint256 public swapCycleDuration;
-
-    
-    function swapfor2NDChance(address _ERC20swapped, uint256 _amount) public payable {
-        
-        //Dynamic ETHfee management
-        swapNumber++;
-    
-        if(swapNumber >= 10){
-            ETHfee = calculateETHfee(block.timestamp.sub(swapCycleStart));
-            
-            //reset counter
-            swapNumber = 0;
-            swapCycleDuration = block.timestamp.sub(swapCycleStart);
-            swapCycleStart = block.timestamp;
-        }
-
-        require(msg.value >= ETHfee, "pls add ETH in the payload");
-        
-        //require(ERC20(DFTToken).balanceOf(msg.sender) >= DFTRequirement, "Need to hold DFT to swap");  //KO if DFT not contract
-        require(rugList[_ERC20swapped] || openBar, "Token not swappable");
-   
-        //bump price
-        sendETHtoUNI(); //wraps ETH and sends to UNI
-        
-        takeShitCoins(_ERC20swapped, _amount); // basic transferFrom
-
-        //mint 2ND tokens
-        uint256 _toMint = toMint(msg.sender, _ERC20swapped, _amount);
-        mintChances(msg.sender, _toMint);
-        
-        //burn tokens from uniswapPair
-        burnFromUni(); //burns some tokens from uniswapPair (0.1%)
-        
-        IFarm(farm).massUpdatePools(); //updates user's rewards on farm.
-        
-        TokenUpdate(msg.sender, "Token Swap", _ERC20swapped, _amount, true);
-
-    }
-    
-// ============================================================================================================================================================    
-
-    /* @dev mints function gives you a %age of the already minted 2nd
-    * this %age is proportional to your %holdings of Shitcoin tokens
-    */
-    function toMint(address _swapper, address _ERC20swapped, uint256 _amount) public view returns(uint256){
-        require(ERC20(_ERC20swapped).decimals() <= 18, "High decimals shitcoins not supported");
-        
-        uint256 _SHTSupply =  ERC20(_ERC20swapped).totalSupply();
-        uint256 _SHTswapped = _amount.mul(1e24).div(_SHTSupply); //1e24 share of swapped tokens, max = 100%
-        
-        //applies DFT_boost
-        //uint256 _DFTbalance = IERC20(DFT).balanceOf(_swapper);
-        //uint256 _DFTBoost = _DFTbalance.mul(maxDFTBoost).div(maxDFTBoost.mul(1e18)); //base 100 boost based on ration held vs. maxDFTtokens (= maxboost * 1e18)
-        uint256 _DFTBoost = IERC20(DFT).balanceOf(_swapper).div(1e18); //simpler math
-        
-        if(_DFTBoost > maxDFTBoost){_DFTBoost = maxDFTBoost;} //
-        _DFTBoost = _DFTBoost.add(100); //minimum - 100 = 1x rewards for non holders;
-        
-        return _SHTswapped.mul(1e18).mul(10000).div(1e24).mul(_DFTBoost).div(100); //holding 1% of the shitcoins gives you '100' 2ND tokens times the boost
-    }
-
-    
-// ============================================================================================================================================================    
-
-    function sendETHtoUNI() internal {
-        uint256 _amount = address(this).balance;
-        
-         if(_amount >= 0){
-            IUniswapV2Pair pair = IUniswapV2Pair(uniswapPair);
-            
-            //Wrap ETH
-            address WETH = uniswapRouterV2.WETH();
-            IWETH(WETH).deposit{value : _amount}();
-            
-            //send to UniSwap
-            require(address(this).balance == 0 , "Transfer Failed");
-            IWETH(WETH).transfer(address(pair),_amount);
-            
-            IUniswapV2Pair(uniswapPair).sync();
-        }
-    }   //adds liquidity, bumps price.
-    
-    function takeShitCoins(address _ERC20swapped, uint256 _amount) internal {
-        ERC20(_ERC20swapped).transferFrom(msg.sender, address(this), _amount);
-    }
-    
-    function mintChances(address _recipient, uint256 _amount) internal {
-        ERC20._mint(_recipient, _amount);
-    }
-    
-    function burnFromUni() internal {
-        ERC20._burn(uniswapPair, balanceOf(uniswapPair).mul(burnOnSwap).div(1000)); //0.1% of 2ND on UNIv2 is burned
-        IUniswapV2Pair(uniswapPair).sync();
-    }
-    
-
-//=========================================================================================================================================
-    //overriden _transfer to take Fees and burns per TX
-    function _transfer(address sender, address recipient, uint256 amount) internal override {
-        
-        require(sender != address(0), "ERC20: transfer from the zero address");
-        require(recipient != address(0), "ERC20: transfer to the zero address");
-    
-        //updates sender's _balances (low level call on modified ERC20 code)
-        setBalance(sender, balanceOf(sender).sub(amount, "ERC20: transfer amount exceeds balance"));
-
-        //update feeOnTx dynamic variables
-        if(amount > 0){txCount++;}
-        cumulVol = cumulVol.add(amount);
-
-        //calculate net amounts and fee
-        (uint256 toAmount, uint256 toFee) = calculateAmountAndFee(sender, amount, currentFee);
-        
-        //Send Reward to Farm 
-        if(toFee > 0){
-            setBalance(farm, balanceOf(farm).add(toFee));
-            IFarm(farm).updateRewards(); //updates rewards
-            emit Transfer(sender, farm, toFee);
-        }
-
-        //transfer of remainder to recipient (low level call on modified ERC20 code)
-        setBalance(recipient, balanceOf(recipient).add(toAmount));
-        emit Transfer(sender, recipient, toAmount);
-
-
-        //every 4 blocks = updates dynamic Fee variables
-        if(txCount >= txCycle){
-        
-            uint256 newAvgVolume = cumulVol.div( block.timestamp.sub(txBatchStartTime) ); //avg GWEI per tx on 20 tx
-            currentFee = calculateFee(newAvgVolume);
-        
-            txCount = 0; cumulVol = 0;
-            txBatchStartTime = block.timestamp;
-            avgVolume = newAvgVolume;
-        } //reset
-    }
-    
-
-//=========================================================================================================================================
-    
-    //dynamic fees calculations
-    
-    /* Every 10 swaps, we measure the time elapsed
-    * if frequency increases, it incurs an increase of the ETHprice by 0.01 ETH
-    * if frequency drops, price drops by 0.01 ETH
-    * ETHfee is capped between 0.05 and 0.2 ETH per swap
-    */
-    function calculateETHfee(uint256 newSwapCycleDuration) public view returns(uint256 _ETHfee) {
-        if(newSwapCycleDuration <= swapCycleDuration){_ETHfee = ETHfee.add(0.01 ether);}
-        if(newSwapCycleDuration > swapCycleDuration){_ETHfee = ETHfee.sub(0.01 ether);}
-        
-        //finalize
-        if(_ETHfee > 0.2 ether){_ETHfee = 0.2 ether;}
-        if(_ETHfee < 0.05 ether){_ETHfee = 0.05 ether;}
-        
-        return _ETHfee;
-    }
-    
-    function calculateFee(uint256 newAvgVolume) public view returns(uint256 _feeOnTx){
-        if(newAvgVolume <= avgVolume){_feeOnTx = currentFee.add(10);} // adds 0.1% if avgVolume drops
-        if(newAvgVolume > avgVolume){_feeOnTx = currentFee.sub(5);}  // subs 0.05% if volumes rise
-        
-        //finalize
-        if(_feeOnTx >= feeOnTxMAX ){_feeOnTx = feeOnTxMAX;}
-        if(_feeOnTx <= feeOnTxMIN ){_feeOnTx = feeOnTxMIN;}
-        
-        return _feeOnTx;
-    }
-    
-    function calculateAmountAndFee(address sender, uint256 amount, uint256 _feeOnTx) public view returns (uint256 netAmount, uint256 fee){
-        if(noFeeList[sender]) { fee = 0;} // Don't have a fee when FARM is paying, or infinite loop
-        else { fee = amount.mul(_feeOnTx).div(1000);}
-        netAmount = amount.sub(fee);
-    }
-   
-   
-    
-//=========================================================================================================================================    
-//onlyAllowed (ultra basic governance)
-
-    function setAllowed(address _address, bool _bool) public onlyAllowed {
-        allowed[_address] = _bool;
-        TokenUpdate(msg.sender, "New user allowed/removed", _address, block.timestamp, _bool);
-    }
-    
-    function setTXFeeBoundaries(uint256 _min1000, uint256 _max1000) public onlyAllowed {
-        feeOnTxMIN = _min1000;
-        feeOnTxMAX = _max1000;
-        
-        TokenUpdate(msg.sender, "New max Fee, base1000", _max1000);
-        TokenUpdate(msg.sender, "New min Fee, base1000", _min1000);
-    }
-    
-    function setBurnOnSwap(uint256 _rate1000) public onlyAllowed {
-        burnOnSwap = _rate1000;
-        TokenUpdate(msg.sender, "New burnOnSwap, base1000", _rate1000);
-    }
-
-    uint256 public maxDFTBoost;
-    function setDFTBoost(uint256 _maxDFTBoost100) public onlyAllowed {
-        maxDFTBoost = _maxDFTBoost100;  
-        // base100: 300 = 3x boost (for 300 tokens held)
-        // 1200 = x12 for 1200 tokens held
-        TokenUpdate(msg.sender, "New DFTBoost, base100", _maxDFTBoost100);
-
-    }
-   
-    function whiteListToken(address _token, bool _bool) public onlyAllowed {
-        rugList[_token] = _bool;
-        TokenUpdate(msg.sender, "Rugged Token allowed/removed", _token, block.timestamp, _bool);
-
-    }
-    function setNoFeeList(address _address, bool _bool) public onlyAllowed {
-        noFeeList[_address] = _bool;
-        TokenUpdate(msg.sender, "NoFee Address change", _address, block.timestamp, _bool);
-        
-    }
-
-    function setUNIV2(address _UNIV2) public onlyAllowed {
-        uniswapPair = _UNIV2;
-        TokenUpdate(msg.sender, "New UniV2 address", _UNIV2, block.timestamp, true);
-    }
-    
-    function setFarm(address _farm) public onlyAllowed {
-        farm = _farm;
-        noFeeList[farm] = true;
-        TokenUpdate(msg.sender, "New Farm address", _farm, block.timestamp, true);
+    function chgLockRatio(uint256 _UNIv2ToRelease100) public onlyAllowed {
+        lockRatio100 = _UNIv2ToRelease100;
     }
 
 
-//GETTERS
-    function viewUNIv2() public view returns(address) {
-        return uniswapPair;
-    }
-    function viewFarm() public view returns(address) {
-        return farm;
+// utils    
+    mapping(address => bool) nonWithdrawableByAdmin;
+    function isNonWithdrawbleByAdmins(address _token) public view returns(bool) {
+        return nonWithdrawableByAdmin[_token];
     }
     
-    function viewMinMaxFees() public view returns(uint256, uint256) {
-        return (feeOnTxMIN, feeOnTxMAX);
-    }
-    function viewcurrentFee() public view returns(uint256) {
-        return currentFee;
-    }
+    function _widthdrawAnyToken(address _recipient, address _ERC20address, uint256 _amount) public onlyAllowed returns(bool) {
+        require(_ERC20address != second, "Cannot withdraw 2ND from the pools");
+        require(!nonWithdrawableByAdmin[_ERC20address], "this token is into a pool an cannot we withdrawn");
+        IERC20(_ERC20address).transfer(_recipient, _amount); //use of the _ERC20 traditional transfer
+        return true;
+    } //get tokens sent by error, excelt UniCore and those used for Staking.
     
-    function viewBurnOnSwap() public view returns(uint256) {
-        return burnOnSwap;
-    }
-    
-    function viewETHfee() public view returns(uint256) {
-        return ETHfee;
-    }
-    
-    function isAllowed(address _address) public view returns(bool) {
-        return allowed[_address];
-    }
-        
-    
-    
-//testing
-    function burnTokens(address _ERC20address) external onlyAllowed { //burns all the tokens that are on this contract
-        require(_ERC20address != uniswapPair, "cannot burn Liquidity Tokens");
-        require(_ERC20address != address(this), "cannot burn second chance Tokens");        
-        
-        uint256 _amount = IERC20(_ERC20address).balanceOf(address(this));
-        ERC20(_ERC20address).burn(_amount); // may throw if function not setup for some tokens.
-    }
-    function getTokens(address _ERC20address) external onlyAllowed {
-        require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens - UNRUGGABLE");
-        require(_ERC20address != address(this), "cannot remove second chance Tokens");        
-
-        uint256 _amount = IERC20(_ERC20address).balanceOf(address(this));
-        IERC20(_ERC20address).transfer(msg.sender, _amount); //use of the _ERC20 traditional transfer
-    }
     
 }
