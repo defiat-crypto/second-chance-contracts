@@ -212,7 +212,7 @@ contract Rug_Sanctuary {
     }
  
     uint256 private secondBalance;
-    function _updateRewards() external onlyToken {
+    function updateRewards() external onlyToken {
         uint256 newRewards = IERC20(second).balanceOf(address(this)).sub(secondBalance); //delta vs previous balanceOf
 
         if(newRewards > 0) {
