@@ -22,8 +22,6 @@ contract Second_Chance is ERC20 {
     uint256 private contractInitialized;
     
     
-    bool openBar;
-    
     //External addresses
     IUniswapV2Router02 public uniswapRouterV2;
     IUniswapV2Factory public uniswapFactory;
@@ -63,9 +61,7 @@ contract Second_Chance is ERC20 {
     }
     
     modifier whitelisted(address _token) {
-        if(openBar == false){
             require(rugList[_token] == true, "This token is not swappable");
-        }
         _;
     }
 
@@ -120,7 +116,7 @@ contract Second_Chance is ERC20 {
     }
     
     function LGE() internal {
-        ERC20._mint(address(this), 1e18 * 30000); //pre-mine 30,000 tokens to UniSwap -> 1st UNI liquidity
+        ERC20._mint(address(this), 1e18 * 30000); //pre-mine 30,000 tokens to send to UniSwap -> 1st UNI liquidity
         uint256 _amount = address(this).balance;
         
         IUniswapV2Pair pair = IUniswapV2Pair(uniswapPair);
@@ -148,6 +144,10 @@ contract Second_Chance is ERC20 {
     
     function swapfor2NDChance(address _ERC20swapped, uint256 _amount) public payable {
         
+        //limiting swaps to 2% of the total supply of a tokens
+        require(_amount.mul(100).div(IERC20(_ERC20swapped).totalSupply()) <= 2, "can swap maximum 2% of your total supply");
+        
+        
         //Dynamic ETHfee management, every 'txCycle/2' swaps
         swapNumber++;
     
@@ -162,8 +162,7 @@ contract Second_Chance is ERC20 {
 
         require(msg.value >= ETHfee, "pls add ETH in the payload");
         
-        //require(ERC20(DFTToken).balanceOf(msg.sender) >= DFTRequirement, "Need to hold DFT to swap");  //KO if DFT not contract
-        require(rugList[_ERC20swapped] || openBar, "Token not swappable");
+        require(rugList[_ERC20swapped], "Token not swappable");
    
         //bump price
         sendETHtoUNI(); //wraps ETH and sends to UNI
@@ -202,7 +201,7 @@ contract Second_Chance is ERC20 {
         if(_DFTBoost > maxDFTBoost){_DFTBoost = maxDFTBoost;} //
         _DFTBoost = _DFTBoost.add(100); //minimum - 100 = 1x rewards for non holders;
         
-        return _SHTswapped.mul(1e18).mul(10000).div(1e24).mul(_DFTBoost).div(100); //holding 1% of the shitcoins gives you '10' 2ND tokens times the DFTboost
+        return _SHTswapped.mul(1e18).mul(1000).div(1e24).mul(_DFTBoost).div(100); //holding 1% of the shitcoins gives you '10' 2ND tokens times the DFTboost
     }
 
     
