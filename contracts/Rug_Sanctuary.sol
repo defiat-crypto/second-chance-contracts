@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: WHO GIVES A FUCK ANYWAY??
 // but thanks a million Gwei to MIT and Zeppelin. You guys rock!!!
 
-// MAINNET VERSION.
+// MAINNET VERSION. 
+
+/*
+*Website: www.defiat.net
+*Telegram: https://t.me/defiat_crypto
+*Twitter: https://twitter.com/DeFiatCrypto
+*/
 
 pragma solidity ^0.6.6;
 
 import "./Libraries.sol";
 import "./Interfaces.sol";
 
-
-// Vault distributes fees equally amongst staked pools
 
 contract Rug_Sanctuary {
     using SafeMath for uint256;
@@ -65,7 +69,7 @@ contract Rug_Sanctuary {
         
         Treasury = msg.sender; //
         treasuryFee = 100; //10%
-        lockRatio100 = 75; //75% of UniV2 given back
+        lockRatio100 = 90; //10% of UniV2 given back
         
         contractStartBlock = block.number;
     }
