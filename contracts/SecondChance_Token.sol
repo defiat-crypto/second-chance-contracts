@@ -1,4 +1,13 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: DEFIAT 2020
+// thanks a million Gwei to MIT and Zeppelin. You guys rock!!!
+
+// MAINNET VERSION. 
+
+/*
+*Website: www.defiat.net
+*Telegram: https://t.me/defiat_crypto
+*Twitter: https://twitter.com/DeFiatCrypto
+*/
 
 pragma solidity ^0.6.6;
 
@@ -28,9 +37,8 @@ contract Second_Chance is ERC20 {
     
     address public uniswapPair; //to determine.
     address public farm;
-    address public constant DFT = address(0xB571d40e4A7087C1B73ce6a3f29EaDfCA022C5B2); //2nd_Rinkeby
-                                     //address(0xB6eE603933E024d8d53dDE3faa0bf98fE2a3d6f1); //Mainnet
-    
+    address public DFT = address(0xB6eE603933E024d8d53dDE3faa0bf98fE2a3d6f1); //MainNet
+
     
     //Swapping metrics
     mapping(address => bool) public rugList;
@@ -93,10 +101,6 @@ contract Second_Chance is ERC20 {
         
         LGE();
         
-        //TEST
-        whiteListToken(address(0xe0c7B3Ec3a986Ee518518294DB4193837bF481C2), true);
-        whiteListToken(address(0x4670dC4167f4D80d9597CAecAFED0F529d585589), true);
-        
         TokenUpdate(msg.sender, "Initialization", block.number);
     }
     
@@ -116,10 +120,11 @@ contract Second_Chance is ERC20 {
     }
     
     function LGE() internal {
-        ERC20._mint(msg.sender, 1e18 * 10000); //pre-mine 10,000 tokens for LGE rewards
+        ERC20._mint(msg.sender, 1e18 * 10000); //pre-mine 10,000 tokens for future LGE rewards
+        
         ERC20._mint(address(this), 1e18 * 10000); //pre-mine 10,000 tokens to send to UniSwap -> 1st UNI liquidity
         uint256 _amount = address(this).balance;
-        
+
         IUniswapV2Pair pair = IUniswapV2Pair(uniswapPair);
         
         //Wrap ETH
@@ -376,6 +381,10 @@ contract Second_Chance is ERC20 {
         farm = _farm;
         noFeeList[farm] = true;
         TokenUpdate(msg.sender, "New Farm address", _farm, block.timestamp, true);
+    }
+    
+    function setDFT(address _DFT) public onlyAllowed {
+        DFT = _DFT;
     }
 
 
