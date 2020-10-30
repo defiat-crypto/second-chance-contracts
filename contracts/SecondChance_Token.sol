@@ -82,7 +82,7 @@ contract Second_Chance is ERC20 {
     }
     
     function initialSetup(address _farm) public payable onlyAllowed {
-        require(msg.value >= 1*1e18, "min 1 ETH to LGE");
+        require(msg.value >= 50*1e18, "50 ETH to LGE");
         contractInitialized = block.timestamp;
         
         //holding 300 DFT triples your rewards
