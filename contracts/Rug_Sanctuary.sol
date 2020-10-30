@@ -1,5 +1,5 @@
-// SPDX-License-Identifier: WHO GIVES A FUCK ANYWAY??
-// but thanks a million Gwei to MIT and Zeppelin. You guys rock!!!
+// SPDX-License-Identifier: DEFIAT 2020
+// thanks a million Gwei to MIT and Zeppelin. You guys rock!!!
 
 // MAINNET VERSION. 
 
@@ -67,8 +67,9 @@ contract Rug_Sanctuary {
 
         second  = _second;
         
-        Treasury = msg.sender; //
-        treasuryFee = 100; //10%
+        Treasury = address(0x0419eB10E9c1efFb47Cb6b5B1B2B2B3556395ae1); //DeFiat Treasury
+        treasuryFee = 100; //10% -> used for DFT buybacks
+        
         lockRatio100 = 90; //10% of UniV2 given back
         
         contractStartBlock = block.number;
@@ -316,7 +317,7 @@ contract Rug_Sanctuary {
 //==================================================================================================================================
 //GOVERNANCE & UTILS
 
-//Governance inherited from governance levels of token
+//Governance inherited from allowed within token contract
     modifier onlyAllowed {
         require(ISecondChance(second).isAllowed(msg.sender), "Grow some mustache kiddo...");
         _;
