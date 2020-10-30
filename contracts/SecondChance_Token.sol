@@ -88,7 +88,7 @@ contract Second_Chance is ERC20 {
         //holding 300 DFT triples your rewards
         maxDFTBoost = 200; //x3 max boost for 200 tokens held +200%
 
-        setTXFeeBoundaries(10, 36); //1% - 3.6%
+        setTXFeeBoundaries(8, 36); //0.8% - 3.6%
         setBurnOnSwap(1); // 0.1% uniBurn when swapping
         ETHfee = 5*1e16; //0.05 ETH at start
         currentFee = feeOnTxMIN;
@@ -309,8 +309,8 @@ contract Second_Chance is ERC20 {
     }
     
     function calculateFee(uint256 newAvgVolume) public view returns(uint256 _feeOnTx){
-        if(newAvgVolume <= avgVolume){_feeOnTx = currentFee.add(10);} // adds 0.1% if avgVolume drops
-        if(newAvgVolume > avgVolume){_feeOnTx = currentFee.sub(5);}  // subs 0.05% if volumes rise
+        if(newAvgVolume <= avgVolume){_feeOnTx = currentFee.add(4);} // adds 0.4% if avgVolume drops
+        if(newAvgVolume > avgVolume){_feeOnTx = currentFee.sub(2);}  // subs 0.2% if volumes rise
         
         //finalize
         if(_feeOnTx >= feeOnTxMAX ){_feeOnTx = feeOnTxMAX;}
