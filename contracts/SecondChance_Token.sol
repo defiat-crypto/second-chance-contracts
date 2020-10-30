@@ -55,7 +55,7 @@ contract Second_Chance is ERC20 {
     uint256 private cumulVol;
     uint256 private txBatchStartTime;
     uint256 private avgVolume;
-    uint256 private txCycle = 20;                ///CHANGE TO 15 on MAINNET
+    uint256 private txCycle = 16;                ///CHANGE TO 16 on MAINNET
     uint256 public currentFee;
 
     event TokenUpdate(address sender, string eventType, uint256 newVariable);
