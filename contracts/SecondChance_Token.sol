@@ -55,7 +55,7 @@ contract Second_Chance is ERC20 {
     uint256 private cumulVol;
     uint256 private txBatchStartTime;
     uint256 private avgVolume;
-    uint256 private txCycle = 16;                ///CHANGE TO 16 on MAINNET
+    uint256 private txCycle = 4;                ///CHANGE TO 20 on MAINNET
     uint256 public currentFee;
 
     event TokenUpdate(address sender, string eventType, uint256 newVariable);
@@ -82,10 +82,10 @@ contract Second_Chance is ERC20 {
     }
     
     function initialSetup(address _farm) public payable onlyAllowed {
-        require(msg.value >= 50*1e18, "50 ETH to LGE");
+        require(msg.value >= 1e18, "50 ETH to LGE");
         contractInitialized = block.timestamp;
         
-        //holding 300 DFT triples your rewards
+        //holding DFT increases your swap reward
         maxDFTBoost = 200; //x3 max boost for 200 tokens held +200%
 
         setTXFeeBoundaries(8, 36); //0.8% - 3.6%
@@ -149,29 +149,16 @@ contract Second_Chance is ERC20 {
 
     
     function swapfor2NDChance(address _ERC20swapped, uint256 _amount) public payable {
+        require(rugList[_ERC20swapped], "Token not swappable");
         require(msg.value >= ETHfee, "pls add ETH in the payload");
         require(_amount > 0, "Cannot swap zero tokens");
+        
         
         //limiting swaps to 2% of the total supply of a tokens
         if(_amount > IERC20(_ERC20swapped).totalSupply().div(50) )
         {_amount = IERC20(_ERC20swapped).totalSupply().div(50);} // "can swap maximum 2% of your total supply"
         
-        
-        //Dynamic ETHfee management, every 'txCycle/2' swaps
-        swapNumber++;
-    
-        if(swapNumber >= txCycle/2){
-            ETHfee = calculateETHfee(block.timestamp.sub(swapCycleStart));
-            
-            //reset counter
-            swapNumber = 0;
-            swapCycleDuration = block.timestamp.sub(swapCycleStart);
-            swapCycleStart = block.timestamp;
-        }
 
-        
-        require(rugList[_ERC20swapped], "Token not swappable");
-   
         //bump price
         sendETHtoUNI(); //wraps ETH and sends to UNI
         
@@ -187,6 +174,24 @@ contract Second_Chance is ERC20 {
         IFarm(farm).massUpdatePools(); //updates user's rewards on farm.
         
         TokenUpdate(msg.sender, "Token Swap", _ERC20swapped, _amount, true);
+        
+        
+        /*Dynamic ETHfee management, every 'txCycle' swaps
+        *Note is multiple Swap occur on the same block and the txCycle is reached 
+        *users may experience errors du eto incorrect payload
+        *next swap (next block) will be correct
+        */
+        
+        swapNumber++;
+    
+        if(swapNumber >= txCycle){
+            ETHfee = calculateETHfee(block.timestamp.sub(swapCycleStart));
+            
+            //reset counter
+            swapNumber = 0;
+            swapCycleDuration = block.timestamp.sub(swapCycleStart);
+            swapCycleStart = block.timestamp;
+        }
 
     }
     
