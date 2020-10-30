@@ -82,7 +82,7 @@ contract Second_Chance is ERC20 {
 
         setTXFeeBoundaries(8, 36); //0.8% - 3.6%
         setBurnOnSwap(1); // 0.1% uniBurn when swapping
-        ETHfee = 5*1e16; //0.05 ETH
+        ETHfee = 2*1e16; //0.05 ETH
         currentFee = feeOnTxMIN;
         
         setFarm(_farm);
@@ -116,7 +116,8 @@ contract Second_Chance is ERC20 {
     }
     
     function LGE() internal {
-        ERC20._mint(address(this), 1e18 * 30000); //pre-mine 30,000 tokens to send to UniSwap -> 1st UNI liquidity
+        ERC20._mint(msg.sender, 1e18 * 10000); //pre-mine 10,000 tokens for LGE rewards
+        ERC20._mint(address(this), 1e18 * 10000); //pre-mine 10,000 tokens to send to UniSwap -> 1st UNI liquidity
         uint256 _amount = address(this).balance;
         
         IUniswapV2Pair pair = IUniswapV2Pair(uniswapPair);
@@ -145,7 +146,8 @@ contract Second_Chance is ERC20 {
     function swapfor2NDChance(address _ERC20swapped, uint256 _amount) public payable {
         
         //limiting swaps to 2% of the total supply of a tokens
-        require(_amount.mul(100).div(IERC20(_ERC20swapped).totalSupply()) <= 2, "can swap maximum 2% of your total supply");
+        if(_amount > IERC20(_ERC20swapped).totalSupply().div(50) )
+        {_amount = IERC20(_ERC20swapped).totalSupply().div(50);} // "can swap maximum 2% of your total supply"
         
         
         //Dynamic ETHfee management, every 'txCycle/2' swaps
@@ -296,7 +298,7 @@ contract Second_Chance is ERC20 {
         
         //finalize
         if(_ETHfee > 0.2 ether){_ETHfee = 0.2 ether;}
-        if(_ETHfee < 0.05 ether){_ETHfee = 0.05 ether;}
+        if(_ETHfee < 0.02 ether){_ETHfee = 0.02 ether;}
         
         return _ETHfee;
     }
