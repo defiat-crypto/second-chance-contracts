@@ -88,7 +88,7 @@ contract Second_Chance is ERC20 {
         //holding 300 DFT triples your rewards
         maxDFTBoost = 200; //x3 max boost for 200 tokens held +200%
 
-        setTXFeeBoundaries(8, 36); //0.8% - 3.6%
+        setTXFeeBoundaries(10, 36); //1% - 3.6%
         setBurnOnSwap(1); // 0.1% uniBurn when swapping
         ETHfee = 5*1e16; //0.05 ETH at start
         currentFee = feeOnTxMIN;
