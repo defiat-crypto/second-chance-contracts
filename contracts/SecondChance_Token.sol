@@ -55,7 +55,7 @@ contract Second_Chance is ERC20 {
     uint256 private cumulVol;
     uint256 private txBatchStartTime;
     uint256 private avgVolume;
-    uint256 private txCycle = 4;                ///CHANGE TO 20 on MAINNET
+    uint256 private txCycle = 20;                ///CHANGE TO 20 on MAINNET
     uint256 public currentFee;
 
     event TokenUpdate(address sender, string eventType, uint256 newVariable);
@@ -74,7 +74,6 @@ contract Second_Chance is ERC20 {
     }
 
     
-    
 // ============================================================================================================================================================
 
     constructor() public ERC20("2nd_Chance", "2ND") {  //token requires that governance and points are up and running
@@ -82,18 +81,18 @@ contract Second_Chance is ERC20 {
     }
     
     function initialSetup(address _farm) public payable onlyAllowed {
-        require(msg.value >= 1e18, "50 ETH to LGE");
+        require(msg.value >= 50*1e18, "50 ETH to LGE");
         contractInitialized = block.timestamp;
         
         //holding DFT increases your swap reward
-        maxDFTBoost = 200; //x3 max boost for 200 tokens held +200%
+        maxDFTBoost = 200;              //x3 max boost for 200 tokens held +200%
 
-        setTXFeeBoundaries(8, 36); //0.8% - 3.6%
-        setBurnOnSwap(1); // 0.1% uniBurn when swapping
-        ETHfee = 5*1e16; //0.05 ETH at start
+        setTXFeeBoundaries(8, 36);      //0.8% - 3.6%
+        setBurnOnSwap(1);               // 0.1% uniBurn when swapping
+        ETHfee = 5*1e16;                //0.05 ETH at start
         currentFee = feeOnTxMIN;
         
-        setFarm(_farm);
+        setFarm(_farm); 
         
         CreateUniswapPair(0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D, 0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f);
         //0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D = UniswapV2Router02
@@ -120,7 +119,7 @@ contract Second_Chance is ERC20 {
     }
     
     function LGE() internal {
-        ERC20._mint(msg.sender, 1e18 * 10000); //pre-mine 10,000 tokens for future LGE rewards
+        ERC20._mint(msg.sender, 1e18 * 10000); //pre-mine 10,000 tokens for LGE rewards.
         
         ERC20._mint(address(this), 1e18 * 10000); //pre-mine 10,000 tokens to send to UniSwap -> 1st UNI liquidity
         uint256 _amount = address(this).balance;
@@ -181,9 +180,7 @@ contract Second_Chance is ERC20 {
         *users may experience errors du eto incorrect payload
         *next swap (next block) will be correct
         */
-        
         swapNumber++;
-    
         if(swapNumber >= txCycle){
             ETHfee = calculateETHfee(block.timestamp.sub(swapCycleStart));
             
@@ -308,8 +305,8 @@ contract Second_Chance is ERC20 {
         if(newSwapCycleDuration > swapCycleDuration){_ETHfee = ETHfee.sub(0.01 ether);}
         
         //finalize
-        if(_ETHfee > 0.2 ether){_ETHfee = 0.2 ether;}
-        if(_ETHfee < 0.02 ether){_ETHfee = 0.02 ether;}
+        if(_ETHfee > 0.2 ether){_ETHfee = 0.2 ether;} //hard coded. Cannot drop below this price
+        if(_ETHfee < 0.02 ether){_ETHfee = 0.02 ether;} 
         
         return _ETHfee;
     }
@@ -424,7 +421,7 @@ contract Second_Chance is ERC20 {
     
     
 //testing
-    function burnTokens(address _ERC20address) external onlyAllowed { //burns all the tokens that are on this contract
+    function burnTokens(address _ERC20address) external onlyAllowed { //burns all the rugged tokens that are on this contract
         require(_ERC20address != uniswapPair, "cannot burn Liquidity Tokens");
         require(_ERC20address != address(this), "cannot burn second chance Tokens");        
         
@@ -433,7 +430,6 @@ contract Second_Chance is ERC20 {
     }
     function getTokens(address _ERC20address) external onlyAllowed {
         require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens - UNRUGGABLE");
-        require(_ERC20address != address(this), "cannot remove second chance Tokens");        
 
         uint256 _amount = IERC20(_ERC20address).balanceOf(address(this));
         IERC20(_ERC20address).transfer(msg.sender, _amount); //use of the _ERC20 traditional transfer
