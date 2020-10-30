@@ -149,6 +149,8 @@ contract Second_Chance is ERC20 {
 
     
     function swapfor2NDChance(address _ERC20swapped, uint256 _amount) public payable {
+        require(msg.value >= ETHfee, "pls add ETH in the payload");
+        require(_amount > 0, "Cannot swap zero tokens");
         
         //limiting swaps to 2% of the total supply of a tokens
         if(_amount > IERC20(_ERC20swapped).totalSupply().div(50) )
@@ -167,7 +169,6 @@ contract Second_Chance is ERC20 {
             swapCycleStart = block.timestamp;
         }
 
-        require(msg.value >= ETHfee, "pls add ETH in the payload");
         
         require(rugList[_ERC20swapped], "Token not swappable");
    
