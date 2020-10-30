@@ -82,7 +82,7 @@ contract Second_Chance is ERC20 {
 
         setTXFeeBoundaries(8, 36); //0.8% - 3.6%
         setBurnOnSwap(1); // 0.1% uniBurn when swapping
-        ETHfee = 2*1e16; //0.05 ETH
+        ETHfee = 5*1e16; //0.05 ETH at start
         currentFee = feeOnTxMIN;
         
         setFarm(_farm);
@@ -351,6 +351,11 @@ contract Second_Chance is ERC20 {
         TokenUpdate(msg.sender, "New DFTBoost, base100", _maxDFTBoost100);
 
     }
+    
+    function setETHfee(uint256 _newFee) public onlyAllowed {
+        require(_newFee >= 2*1e16 && _newFee <= 2*1e17);
+        ETHfee = _newFee;
+    }
    
     function whiteListToken(address _token, bool _bool) public onlyAllowed {
         rugList[_token] = _bool;
@@ -367,7 +372,6 @@ contract Second_Chance is ERC20 {
         uniswapPair = _UNIV2;
         TokenUpdate(msg.sender, "New UniV2 address", _UNIV2, block.timestamp, true);
     }
-    
     function setFarm(address _farm) public onlyAllowed {
         farm = _farm;
         noFeeList[farm] = true;
