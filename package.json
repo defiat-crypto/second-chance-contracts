@@ -1,17 +1,31 @@
 {
-  "name": "defiat-contracts",
+  "name": "second-chance-contracts",
   "version": "1.0.0",
+  "license": "MIT",
   "scripts": {
-    "bootstrap": "lerna bootstrap",
-    "chain": "npm run chain",
-    "compile": "truffle compile",
-    "migrate": "npm run deploy",
-    "publish": "lerna publish",
-    "export": "rsync -a build/ ../defiat-frontend/src/contracts/secondchance/"
+    "compile": "hardhat compile",
+    "dev": "hardhat node --watch",
+    "test": "hardhat test"
   },
   "devDependencies": {
-    "lerna": "^3.4.3",
+    "@ethereum-waffle/chai": "^3.2.2",
+    "@typechain/ethers-v5": "^5.0.0",
+    "@types/chai": "^4.2.14",
+    "@types/mocha": "^8.2.0",
+    "@types/node": "^14.14.22",
+    "chai": "^4.2.0",
+    "cross-env": "^7.0.3",
+    "dotenv": "^8.2.0",
+    "ethers": "^5.0.26",
+    "hardhat": "^2.0.8",
+    "hardhat-abi-exporter": "^2.0.8",
+    "hardhat-deploy": "^0.7.0-beta.44",
+    "hardhat-deploy-ethers": "^0.3.0-beta.7",
+    "hardhat-typechain": "^0.3.4",
     "solc": "0.6.6",
-    "truffle": "^5.1.37"
+    "ts-generator": "^0.1.1",
+    "ts-node": "^9.1.1",
+    "typechain": "^4.0.1",
+    "typescript": "^4.1.3"
   }
 }

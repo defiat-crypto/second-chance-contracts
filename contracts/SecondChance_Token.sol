@@ -13,7 +13,7 @@ pragma solidity ^0.6.6;
 
 import "./ERC20.sol";
 
-contract Second_Chance is ERC20 { 
+contract SecondChance is ERC20 { 
 
     using SafeMath for uint;
     using Address for address;

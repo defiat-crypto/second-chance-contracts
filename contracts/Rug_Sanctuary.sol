@@ -15,7 +15,7 @@ import "./Libraries.sol";
 import "./Interfaces.sol";
 
 
-contract Rug_Sanctuary {
+contract RugSanctuary {
     using SafeMath for uint256;
 
 
