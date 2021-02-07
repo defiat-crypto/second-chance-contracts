@@ -1,23 +1,13 @@
-// SPDX-License-Identifier: DEFIAT 2020
-// thanks a million Gwei to MIT and Zeppelin. You guys rock!!!
-
-// MAINNET VERSION. 
-
-/*
-*Website: www.defiat.net
-*Telegram: https://t.me/defiat_crypto
-*Twitter: https://twitter.com/DeFiatCrypto
-*/
+// SPDX-License-Identifier: MIT
 
 pragma solidity ^0.6.6;
 
-import "./Libraries.sol";
-import "./Interfaces.sol";
-
+import "./interfaces/ISecondChance.sol";
+import "./lib/@openzeppelin/math/SafeMath.sol";
+import "./lib/@openzeppelin/token/ERC20/IERC20.sol";
 
 contract RugSanctuary {
     using SafeMath for uint256;
-
 
     address public second; //token address
     
@@ -172,6 +162,7 @@ contract RugSanctuary {
 
         pool.accPerShare = pool.accPerShare.add(RewardToDistribute.mul(1e18).div(tokenSupply));
     }
+
     function massUpdatePools() public {
         uint256 length = poolInfo.length; 
         uint allRewards;
@@ -268,6 +259,7 @@ contract RugSanctuary {
         _withdraw(_pid, _amount, msg.sender, msg.sender); //25% permanent lock
         transferTreasuryFees();
     }
+
     function _withdraw(uint256 _pid, uint256 _amount, address from, address to) internal {
 
         PoolInfo storage pool = poolInfo[_pid];
@@ -349,6 +341,4 @@ contract RugSanctuary {
         IERC20(_ERC20address).transfer(_recipient, _amount); //use of the _ERC20 traditional transfer
         return true;
     } //get tokens sent by error, excelt UniCore and those used for Staking.
-    
-    
 }

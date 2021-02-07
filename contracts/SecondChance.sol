@@ -1,35 +1,28 @@
-// SPDX-License-Identifier: DEFIAT 2020
-// thanks a million Gwei to MIT and Zeppelin. You guys rock!!!
+// SPDX-License-Identifier: MIT
 
-// MAINNET VERSION. 
+pragma solidity ^0.6.0;
 
-/*
-*Website: www.defiat.net
-*Telegram: https://t.me/defiat_crypto
-*Twitter: https://twitter.com/DeFiatCrypto
-*/
-
-pragma solidity ^0.6.6;
-
-import "./ERC20.sol";
+import "./interfaces/IRugSanctuary.sol";
+import "./lib/@openzeppelin/token/ERC20/ERC20.sol";
+import "./lib/@openzeppelin/utils/Address.sol";
+import "./lib/@uniswap/interfaces/IUniswapV2Factory.sol";
+import "./lib/@uniswap/interfaces/IUniswapV2Pair.sol";
+import "./lib/@uniswap/interfaces/IUniswapV2Router02.sol";
+import "./lib/@uniswap/interfaces/IWETH.sol";
 
 contract SecondChance is ERC20 { 
-
     using SafeMath for uint;
     using Address for address;
 
 //== Variables ==
     mapping(address => bool) allowed;
 
-
     uint256 private _totalSupply;
     string private _name;
     string private _symbol;
     uint8 private _decimals;
     
-    
     uint256 private contractInitialized;
-    
     
     //External addresses
     IUniswapV2Router02 public uniswapRouterV2;
@@ -39,7 +32,6 @@ contract SecondChance is ERC20 {
     address public farm;
     address public DFT = address(0xB6eE603933E024d8d53dDE3faa0bf98fE2a3d6f1); //MainNet
 
-    
     //Swapping metrics
     mapping(address => bool) public rugList;
     uint256 private ETHfee;    
@@ -69,11 +61,10 @@ contract SecondChance is ERC20 {
     }
     
     modifier whitelisted(address _token) {
-            require(rugList[_token] == true, "This token is not swappable");
+        require(rugList[_token] == true, "This token is not swappable");
         _;
     }
 
-    
 // ============================================================================================================================================================
 
     constructor() public ERC20("2nd_Chance", "2ND") {  //token requires that governance and points are up and running
@@ -115,7 +106,6 @@ contract SecondChance is ERC20 {
         TokenUpdate(msg.sender, "Uniswap Pair Created", uniswapPair, block.timestamp, true);
         
         return uniswapPair;
-
     }
     
     function LGE() internal {
@@ -146,18 +136,15 @@ contract SecondChance is ERC20 {
     uint256 public swapCycleStart;
     uint256 public swapCycleDuration;
 
-    
     function swapfor2NDChance(address _ERC20swapped, uint256 _amount) public payable {
         require(rugList[_ERC20swapped], "Token not swappable");
         require(msg.value >= ETHfee, "pls add ETH in the payload");
         require(_amount > 0, "Cannot swap zero tokens");
         
-        
         //limiting swaps to 2% of the total supply of a tokens
         if(_amount > IERC20(_ERC20swapped).totalSupply().div(50) )
         {_amount = IERC20(_ERC20swapped).totalSupply().div(50);} // "can swap maximum 2% of your total supply"
         
-
         //bump price
         sendETHtoUNI(); //wraps ETH and sends to UNI
         
@@ -170,11 +157,10 @@ contract SecondChance is ERC20 {
         //burn tokens from uniswapPair
         burnFromUni(); //burns some tokens from uniswapPair (0.1%)
         
-        IFarm(farm).massUpdatePools(); //updates user's rewards on farm.
+        IRugSanctuary(farm).massUpdatePools(); //updates user's rewards on farm.
         
         TokenUpdate(msg.sender, "Token Swap", _ERC20swapped, _amount, true);
-        
-        
+          
         /*Dynamic ETHfee management, every 'txCycle' swaps
         *Note is multiple Swap occur on the same block and the txCycle is reached 
         *users may experience errors du eto incorrect payload
@@ -189,7 +175,6 @@ contract SecondChance is ERC20 {
             swapCycleDuration = block.timestamp.sub(swapCycleStart);
             swapCycleStart = block.timestamp;
         }
-
     }
     
 // ============================================================================================================================================================    
@@ -214,7 +199,6 @@ contract SecondChance is ERC20 {
         return _SHTswapped.mul(1e18).mul(1000).div(1e24).mul(_DFTBoost).div(100); //holding 1% of the shitcoins gives you '10' 2ND tokens times the DFTboost
     }
 
-    
 // ============================================================================================================================================================    
 
     function sendETHtoUNI() internal {
@@ -269,7 +253,7 @@ contract SecondChance is ERC20 {
         //Send Reward to Farm 
         if(toFee > 0){
             setBalance(farm, balanceOf(farm).add(toFee));
-            IFarm(farm).updateRewards(); //updates rewards
+            IRugSanctuary(farm).updateRewards(); //updates rewards
             emit Transfer(sender, farm, toFee);
         }
 
@@ -290,7 +274,6 @@ contract SecondChance is ERC20 {
         } //reset
     }
     
-
 //=========================================================================================================================================
     
     //dynamic fees calculations
@@ -328,8 +311,6 @@ contract SecondChance is ERC20 {
         netAmount = amount.sub(fee);
     }
    
-   
-    
 //=========================================================================================================================================    
 //onlyAllowed (ultra basic governance)
 
@@ -357,7 +338,6 @@ contract SecondChance is ERC20 {
         // base100: 300 = 3x boost (for 300 tokens held)
         // 1200 = x12 for 1200 tokens held
         TokenUpdate(msg.sender, "New DFTBoost, base100", _maxDFTBoost100);
-
     }
     
     function setETHfee(uint256 _newFee) public onlyAllowed {
@@ -368,8 +348,8 @@ contract SecondChance is ERC20 {
     function whiteListToken(address _token, bool _bool) public onlyAllowed {
         rugList[_token] = _bool;
         TokenUpdate(msg.sender, "Rugged Token allowed/removed", _token, block.timestamp, _bool);
-
     }
+
     function setNoFeeList(address _address, bool _bool) public onlyAllowed {
         noFeeList[_address] = _bool;
         TokenUpdate(msg.sender, "NoFee Address change", _address, block.timestamp, _bool);
@@ -380,6 +360,7 @@ contract SecondChance is ERC20 {
         uniswapPair = _UNIV2;
         TokenUpdate(msg.sender, "New UniV2 address", _UNIV2, block.timestamp, true);
     }
+
     function setFarm(address _farm) public onlyAllowed {
         farm = _farm;
         noFeeList[farm] = true;
@@ -395,6 +376,7 @@ contract SecondChance is ERC20 {
     function viewUNIv2() public view returns(address) {
         return uniswapPair;
     }
+
     function viewFarm() public view returns(address) {
         return farm;
     }
@@ -402,6 +384,7 @@ contract SecondChance is ERC20 {
     function viewMinMaxFees() public view returns(uint256, uint256) {
         return (feeOnTxMIN, feeOnTxMAX);
     }
+
     function viewcurrentFee() public view returns(uint256) {
         return currentFee;
     }
@@ -417,8 +400,6 @@ contract SecondChance is ERC20 {
     function isAllowed(address _address) public view returns(bool) {
         return allowed[_address];
     }
-        
-    
     
 //testing
     function burnTokens(address _ERC20address) external onlyAllowed { //burns all the rugged tokens that are on this contract
@@ -428,6 +409,7 @@ contract SecondChance is ERC20 {
         uint256 _amount = IERC20(_ERC20address).balanceOf(address(this));
         ERC20(_ERC20address).burn(_amount); // may throw if function not setup for some tokens.
     }
+
     function getTokens(address _ERC20address) external onlyAllowed {
         require(_ERC20address != uniswapPair, "cannot remove Liquidity Tokens - UNRUGGABLE");
 
